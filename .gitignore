@@ -1,0 +1,29 @@
+# Repository-level ignores
+
+# Build artifacts and common output folders
+bin/
+build/
+out/
+
+# Assignment-specific build dirs (keep for convenience)
+assignment1/bin/
+assignment2/bin/
+assignment3/bin/
+assignment4/bin/
+
+# Results and temporary experiment outputs
+*/results/
+
+# Object and dependency files
+*.o
+*.d
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
+*~
+
+# Logs
+*.log
