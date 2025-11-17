@@ -1,7 +1,7 @@
 /*
  * assignment1/src/array_stats.c
  * Exercise 1.2 - array statistics
- * Usage: ./bin/array_stats <array_size>
+ * Usage: ./bin/array_stats <array_size> [num_threads]
  *
  * Simple implementation of counting non-zero elements in arrays using both serial and parallel approaches.
  */
@@ -25,10 +25,11 @@ static pthread_mutex_t counter_mutex[4];
 // Structure for thread arguments
 typedef struct {
     int thread_id;
-    int *array;
-    int n;                  // length of the array
-    long long int *counter; // pointer to the shared counter for this array
-    pthread_mutex_t *mutex; // pointer to the mutex protecting that counter
+    int num_threads;            // total number of threads
+    int **arrays;               // pointers to arrays
+    int n;                      // length of the arrays
+    long long int **counters;   // pointers to the shared counters for each array
+    pthread_mutex_t *mutexes;   // pointer to the array of mutexes (one per array)
 } ThreadArgs;
 
 // Return current time in seconds
@@ -41,20 +42,25 @@ static double get_time(void) {
 // Thread routine: count non-zero in provided array
 static void* count_non_zero_parallel(void* arg) {
     ThreadArgs* args = (ThreadArgs*) arg;
-    int *arr = args->array;
+    int tid = args->thread_id;
+    int tcount = args->num_threads;
     int len = args->n;
-    long long int *counter = args->counter;
-    pthread_mutex_t *mtx = args->mutex;
 
-    long long int local_count = 0;
-    for (int i = 0; i < len; i++) {
-        if (arr[i] != 0) local_count++;
+    // For each of the 4 arrays, simple round-robin by array index
+    for (int a = 0; a < 4; a++) {
+        if ((a % tcount) != tid) continue;  // not this thread's array
+
+        int *arr = args->arrays[a];
+        long long int local_count = 0;
+        for (int i = 0; i < len; i++) {
+            if (arr[i] != 0) local_count++;
+        }
+
+        // update shared counter for this array with locking
+        pthread_mutex_lock(&args->mutexes[a]);
+        *args->counters[a] += local_count;
+        pthread_mutex_unlock(&args->mutexes[a]);
     }
-
-    // Upodate shared counter with locking
-    pthread_mutex_lock(mtx);
-    *counter += local_count;
-    pthread_mutex_unlock(mtx);
 
     return NULL;
 }
@@ -76,8 +82,8 @@ static void count_non_zero_serial(int len, int *a0, int *a1, int *a2, int *a3) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <array_size>\n", argv[0]);
+    if (argc < 2 || argc > 3) {
+        fprintf(stderr, "Usage: %s <array_size> [num_threads]\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -85,6 +91,15 @@ int main(int argc, char* argv[]) {
     if (n <= 0) {
         fprintf(stderr, "Array size must be a positive integer\n");
         return EXIT_FAILURE;
+    }
+
+    int num_threads = 4;
+    if (argc == 3) {
+        num_threads = atoi(argv[2]);
+        if (num_threads <= 0) {
+            fprintf(stderr, "Number of threads must be a positive integer\n");
+            return EXIT_FAILURE;
+        }
     }
 
     double start_time, end_time;
@@ -144,15 +159,21 @@ int main(int argc, char* argv[]) {
     array_stats.info_array_2 = 0;
     array_stats.info_array_3 = 0;
 
-    pthread_t threads[4];
-    ThreadArgs args[4];
+    // prepare arrays and counters for flexible thread counts
+    int *arrays[4] = { array0, array1, array2, array3 };
+    long long int *counters[4] = { &array_stats.info_array_0, &array_stats.info_array_1, &array_stats.info_array_2, &array_stats.info_array_3 };
 
-    args[0].thread_id = 0; args[0].array = array0; args[0].n = n; args[0].counter = &array_stats.info_array_0; args[0].mutex = &counter_mutex[0];
-    args[1].thread_id = 1; args[1].array = array1; args[1].n = n; args[1].counter = &array_stats.info_array_1; args[1].mutex = &counter_mutex[1];
-    args[2].thread_id = 2; args[2].array = array2; args[2].n = n; args[2].counter = &array_stats.info_array_2; args[2].mutex = &counter_mutex[2];
-    args[3].thread_id = 3; args[3].array = array3; args[3].n = n; args[3].counter = &array_stats.info_array_3; args[3].mutex = &counter_mutex[3];
+    pthread_t threads[num_threads];
+    ThreadArgs args[num_threads];
 
-    for (int t = 0; t < 4; t++) {
+    for (int t = 0; t < num_threads; t++) {
+        args[t].thread_id = t;
+        args[t].num_threads = num_threads;
+        args[t].arrays = &arrays[0];
+        args[t].n = n;
+        args[t].counters = &counters[0];
+        args[t].mutexes = &counter_mutex[0];
+
         int create_status = pthread_create(&threads[t], NULL, count_non_zero_parallel, &args[t]);
         if (create_status != 0) {
             fprintf(stderr, "Error creating thread %d\n", t);
@@ -161,7 +182,7 @@ int main(int argc, char* argv[]) {
     }
 
     // wait for threads to finish
-    for (int t = 0; t < 4; t++) {
+    for (int t = 0; t < num_threads; t++) {
         pthread_join(threads[t], NULL);
     }
 
