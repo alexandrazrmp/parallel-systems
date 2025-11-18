@@ -35,6 +35,25 @@ void* thread_func_mutex(void* arg) {
     return NULL;
 }
 
+//thread function for read-write lock approach
+void* thread_func_rwlock(void* arg) {
+    for (int i = 0; i < iteration_times; i++) {
+        //update shared variable with read-write lock
+        pthread_rwlock_wrlock(&rwlock);
+        shared_var_rwlock++;
+        pthread_rwlock_unlock(&rwlock);
+    }
+    return NULL;
+}
+
+//thread function for atomic approach
+void* thread_func_atomic(void* arg) {
+    for (int i = 0; i < iteration_times; i++) {
+        //update shared variable with atomic operation
+        __atomic_fetch_add(&shared_var_atomic, 1, __ATOMIC_SEQ_CST);
+    }
+    return NULL;
+}
 
 
 // Function to get the current time in seconds
@@ -73,6 +92,7 @@ int main(int argc, char* argv[]) {
     double start_time, end_time;    // Timing variables
 
     //mutex approach
+    shared_var_mutex = 0;
     start_time = get_time();
     for (int i = 0; i < num_threads; i++) {
         //create threads for mutex approach
@@ -90,12 +110,40 @@ int main(int argc, char* argv[]) {
 
 
     //read-write lock
-
-
-
-
+    shared_var_rwlock = 0;
+    start_time = get_time();
+    for (int i = 0; i < num_threads; i++) {
+        //create threads for rwlock approach
+        if (pthread_create(&threads[i], NULL, thread_func_rwlock, NULL) != 0) {
+            fprintf(stderr, "Error creating thread\n");
+            return EXIT_FAILURE;
+        }
+    }
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
+    end_time = get_time();
+    printf("Read-Write Lock approach - Final value of shared_var: %d\n", shared_var_rwlock);
+    printf("Read-Write Lock approach time: %.6f seconds\n", end_time - start_time);
+    
 
     //atomic operations
+
+    shared_var_atomic = 0;
+    start_time = get_time();
+    for (int i = 0; i < num_threads; i++) {
+        //create threads for atomic approach
+        if (pthread_create(&threads[i], NULL, thread_func_atomic, NULL) != 0) {
+            fprintf(stderr, "Error creating thread\n");
+            return EXIT_FAILURE; 
+        }
+    }
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
+    end_time = get_time();
+    printf("Atomic approach - Final value of shared_var: %d\n", shared_var_atomic);
+    printf("Atomic approach time: %.6f seconds\n", end_time - start_time);
 
 
 }
