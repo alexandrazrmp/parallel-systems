@@ -57,4 +57,6 @@ for iters in "${ITERATIONS_LIST[@]}"; do
 done
 
 echo "Done. Raw results saved to: $RAW_CSV"
-echo "To plot results: python3 $BASEDIR/src/shared_var_plot.py $RAW_CSV"
+echo ""
+echo "To plot results, run the following command:"
+echo "python3 \"$BASEDIR/src/shared_var_plot.py\" \"$RAW_CSV\""
