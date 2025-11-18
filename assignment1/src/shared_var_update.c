@@ -79,8 +79,6 @@ int main(int argc, char* argv[]) {
             shared_var++; //serial update
         }
     }
-    printf("Serial approach - Final value of shared_var: %d\n", shared_var);
-
 
 
     pthread_t *threads = malloc(num_threads * sizeof(pthread_t));
@@ -105,8 +103,8 @@ int main(int argc, char* argv[]) {
         pthread_join(threads[i], NULL);
     }
     end_time = get_time();
-    printf("Mutex approach - Final value of shared_var: %d\n", shared_var);
-    printf("Mutex approach time: %.6f seconds\n", end_time - start_time);
+    double mutex_time = end_time - start_time;
+    printf("Mutex approach time: %.6f seconds\n", mutex_time);
 
 
     //read-write lock
@@ -123,8 +121,8 @@ int main(int argc, char* argv[]) {
         pthread_join(threads[i], NULL);
     }
     end_time = get_time();
-    printf("Read-Write Lock approach - Final value of shared_var: %d\n", shared_var_rwlock);
-    printf("Read-Write Lock approach time: %.6f seconds\n", end_time - start_time);
+    double rwlock_time = end_time - start_time;
+    printf("Read-Write Lock approach time: %.6f seconds\n", rwlock_time);
     
 
     //atomic operations
@@ -142,8 +140,31 @@ int main(int argc, char* argv[]) {
         pthread_join(threads[i], NULL);
     }
     end_time = get_time();
-    printf("Atomic approach - Final value of shared_var: %d\n", shared_var_atomic);
-    printf("Atomic approach time: %.6f seconds\n", end_time - start_time);
+    double atomic_time = end_time - start_time;
+    printf("Atomic approach time: %.6f seconds\n", atomic_time);
 
+    //verify results
+    
+    if (shared_var_mutex != shared_var) {
+        printf("Mutex approach - Incorrect final value: %d\n", shared_var_mutex);
+    }
+    if (shared_var_rwlock != shared_var) {
+        printf("Read-Write Lock approach - Incorrect final value: %d\n", shared_var_rwlock);
+    }
+    if (shared_var_atomic != shared_var) {
+        printf("Atomic approach - Incorrect final value: %d\n", shared_var_atomic);
+    }
+    if (shared_var_mutex == shared_var && shared_var_rwlock == shared_var && shared_var_atomic == shared_var) {
+        printf("Verification: PASS\n");
+    }
+
+
+    // Cleanup
+    free(threads);
+    pthread_mutex_destroy(&mutex);
+    pthread_rwlock_destroy(&rwlock);
+
+
+    return 0;
 
 }
