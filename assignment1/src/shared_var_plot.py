@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python3 shared_var_plot.py <raw_results.csv>")
+        print("Usage: python3 plot_shared_var_comparison.py <raw_results.csv>")
         sys.exit(1)
 
     csv_path = sys.argv[1]
@@ -20,50 +20,39 @@ def main():
     df["threads"] = df["threads"].astype(int)
     df["iterations"] = df["iterations"].astype(int)
 
-    # Group by iterations and threads, average the timing results
+    # Convert microseconds -> seconds if needed
+    # If your CSV already contains seconds, remove this division.
+    df["mutex_time"]   = df["mutex_time"]   / 1_000_000
+    df["rwlock_time"]  = df["rwlock_time"]  / 1_000_000
+    df["atomic_time"]  = df["atomic_time"]  / 1_000_000
+
+    # Average results for same (threads, iterations)
     grouped = df.groupby(["iterations", "threads"], as_index=False).mean()
 
-    iterations_list = sorted(df["iterations"].unique())
+    iterations_list = sorted(grouped["iterations"].unique())
 
     for it in iterations_list:
         subset = grouped[grouped["iterations"] == it]
 
         threads = subset["threads"]
 
-        # --- Plot MUTEX ---
         plt.figure()
         plt.plot(threads, subset["mutex_time"], marker='o', label="Mutex")
-        plt.xlabel("Threads")
-        plt.ylabel("Time (microseconds?)")
-        plt.title(f"Mutex Time vs Threads (iterations={it})")
-        plt.grid(True)
-        plt.legend()
-        plt.savefig(f"{outdir}/mutex_iterations_{it}.png")
-        plt.close()
-
-        # --- Plot RWLOCK ---
-        plt.figure()
         plt.plot(threads, subset["rwlock_time"], marker='o', label="RWLock")
-        plt.xlabel("Threads")
-        plt.ylabel("Time (microseconds?)")
-        plt.title(f"RWLock Time vs Threads (iterations={it})")
-        plt.grid(True)
-        plt.legend()
-        plt.savefig(f"{outdir}/rwlock_iterations_{it}.png")
-        plt.close()
-
-        # --- Plot ATOMIC ---
-        plt.figure()
         plt.plot(threads, subset["atomic_time"], marker='o', label="Atomic")
+
         plt.xlabel("Threads")
-        plt.ylabel("Time (microseconds?)")
-        plt.title(f"Atomic Time vs Threads (iterations={it})")
+        plt.ylabel("Parallel Time (seconds)")
+        plt.title(f"Performance Comparison (iterations = {it})")
         plt.grid(True)
         plt.legend()
-        plt.savefig(f"{outdir}/atomic_iterations_{it}.png")
-        plt.close()
 
-    print(f"Plots saved to: {outdir}")
+        out_file = f"{outdir}/comparison_iterations_{it}.png"
+        plt.savefig(out_file)
+        plt.close()
+        print(f"Saved: {out_file}")
+
+    print("\nAll comparison plots generated.\n")
 
 
 if __name__ == "__main__":
