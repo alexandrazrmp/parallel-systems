@@ -5,7 +5,7 @@
  *
  * bank simulation with transactions on an "account balance" array using parallel programming
  * you can comment out this bit
-                 for (volatile int i = 0; i < 1000; i++) {
+                for (volatile int i = 0; i < 1000; i++) {
                     // tiny busy-wait loop
                 }
 */
@@ -40,41 +40,36 @@ int *balances;
 
 // Thread function performing transactions
 void *thread_func(void *arg) {
-    unsigned int seed = (uintptr_t)arg ^ time(NULL); // per-thread seed for rand_r
+    unsigned int seed = (uintptr_t)arg ^ time(NULL); // per-thread seed for rand_r  (thread-safe)
     for (int t = 0; t < transactions_per_thread; t++) {
         int op = (rand_r(&seed) % 100 < query_percentage) ? balance_check : money_transfer;     //deciding on transaction operation
 
         if (op == balance_check) {
             int idx = rand_r(&seed) % n_elements;
-            int sum = 0;
             // Lock depending on the approach
             if (lock_type == course_grained_mutex) {
                 pthread_mutex_lock(&global_mutex);
-                sum += balances[idx];
-                for (volatile int i = 0; i < 1000; i++) {
-                    // tiny busy-wait loop
-                }
+                 for (volatile int i = 0; i < 1000; i++) {
+                     // tiny busy-wait loop
+                 }
                 pthread_mutex_unlock(&global_mutex);
             } else if (lock_type == fine_grained_mutex) {
                 pthread_mutex_lock(&mutexes[idx]);
-                sum += balances[idx];
-                for (volatile int i = 0; i < 1000; i++) {
-                    // tiny busy-wait loop
-                }
+                 for (volatile int i = 0; i < 1000; i++) {
+                     // tiny busy-wait loop
+                 }
                 pthread_mutex_unlock(&mutexes[idx]);
             } else if (lock_type == course_grained_rw_lock) {
                 pthread_rwlock_rdlock(&global_rwlock);
-                sum += balances[idx];
-                for (volatile int i = 0; i < 1000; i++) {
-                    // tiny busy-wait loop
-                }
+                 for (volatile int i = 0; i < 1000; i++) {
+                     // tiny busy-wait loop
+                 }
                 pthread_rwlock_unlock(&global_rwlock);
             } else if (lock_type == fine_grained_rw_lock) {
                 pthread_rwlock_rdlock(&rwlocks[idx]);
-                sum += balances[idx];
-                for (volatile int i = 0; i < 1000; i++) {
-                    // tiny busy-wait loop
-                }
+                 for (volatile int i = 0; i < 1000; i++) {
+                     // tiny busy-wait loop
+                 }
 
                 pthread_rwlock_unlock(&rwlocks[idx]);
             }

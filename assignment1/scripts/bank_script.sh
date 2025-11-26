@@ -10,7 +10,7 @@ RAW_CSV="$OUTDIR/raw_results.csv"
 
 ELEMENTS_LIST=(1000 10000 50000 100000)
 TRANSACTIONS_LIST=(10000 50000 100000 500000)
-QUERY_PERCENTAGES=(10 30 50 70 90)
+QUERY_PERCENTAGES=(0 10 30 50 70 90 100)
 LOCK_TYPES=(1 2 3 4)
 THREADS=4
 REPEATS=4
@@ -33,8 +33,18 @@ for elems in "${ELEMENTS_LIST[@]}"; do
 
         for ((i=1; i<=REPEATS; i++)); do
 
-          out="$("$BIN" "$elems" "$trans" "$q" "$lock" "$THREADS" 2>&1)"
+          # Run program and capture output + exit code
+          if ! out="$("$BIN" "$elems" "$trans" "$q" "$lock" "$THREADS" 2>&1)"; then
+            echo ""
+            echo "❌ ERROR: Program crashed or returned non-zero exit code!"
+            echo "Elements=$elems Transactions=$trans Query=$q Lock=$lock Run=$i"
+            echo ""
+            echo "Output:"
+            echo "$out"
+            exit 1
+          fi
 
+          # Check correctness
           if ! echo "$out" | grep -q "Verification: PASS"; then
             echo ""
             echo "❌ ERROR: Verification failed!"
@@ -47,7 +57,13 @@ for elems in "${ELEMENTS_LIST[@]}"; do
             exit 1
           fi
 
-          time=$(echo "$out" | awk '/Execution time/ {print $3}')
+          # Extract execution time safely
+          time=$(echo "$out" | grep "Execution time" | awk '{print $3}')
+          if [[ -z "$time" ]]; then
+            echo "❌ ERROR: Failed to parse execution time!"
+            echo "$out"
+            exit 1
+          fi
 
           printf "%s,%s,%s,%s,%d,%s\n" \
             "$elems" "$trans" "$q" "$lock" "$i" "$time" >> "$RAW_CSV"
