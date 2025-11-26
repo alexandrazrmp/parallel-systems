@@ -3,15 +3,19 @@
  * Exercise 1.4 - Bank Simulation
  * Usage: ./bin/shared_var_update <iteration_times> <num_threads>
  *
- * small description
+ * bank simulation with transactions on an "account balance" array using parallel programming
+ * you can comment out this bit
+                 for (volatile int i = 0; i < 1000; i++) {
+                    // tiny busy-wait loop
+                }
 */
-
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #define money_transfer 1
 #define balance_check 2
@@ -34,11 +38,95 @@ int lock_type;
 int num_threads;
 int *balances;
 
-
-
-
+// Thread function performing transactions
 void *thread_func(void *arg) {
+    unsigned int seed = (uintptr_t)arg ^ time(NULL); // per-thread seed for rand_r
+    for (int t = 0; t < transactions_per_thread; t++) {
+        int op = (rand_r(&seed) % 100 < query_percentage) ? balance_check : money_transfer;     //deciding on transaction operation
 
+        if (op == balance_check) {
+            int idx = rand_r(&seed) % n_elements;
+            int sum = 0;
+            // Lock depending on the approach
+            if (lock_type == course_grained_mutex) {
+                pthread_mutex_lock(&global_mutex);
+                sum += balances[idx];
+                for (volatile int i = 0; i < 1000; i++) {
+                    // tiny busy-wait loop
+                }
+                pthread_mutex_unlock(&global_mutex);
+            } else if (lock_type == fine_grained_mutex) {
+                pthread_mutex_lock(&mutexes[idx]);
+                sum += balances[idx];
+                for (volatile int i = 0; i < 1000; i++) {
+                    // tiny busy-wait loop
+                }
+                pthread_mutex_unlock(&mutexes[idx]);
+            } else if (lock_type == course_grained_rw_lock) {
+                pthread_rwlock_rdlock(&global_rwlock);
+                sum += balances[idx];
+                for (volatile int i = 0; i < 1000; i++) {
+                    // tiny busy-wait loop
+                }
+                pthread_rwlock_unlock(&global_rwlock);
+            } else if (lock_type == fine_grained_rw_lock) {
+                pthread_rwlock_rdlock(&rwlocks[idx]);
+                sum += balances[idx];
+                for (volatile int i = 0; i < 1000; i++) {
+                    // tiny busy-wait loop
+                }
+
+                pthread_rwlock_unlock(&rwlocks[idx]);
+            }
+        } else { // money_transfer
+            int from = rand_r(&seed) % n_elements;
+            int to = rand_r(&seed) % n_elements;
+            while (to == from) to = rand_r(&seed) % n_elements;
+            int amount = rand_r(&seed) % 100;
+
+            if (lock_type == course_grained_mutex) {
+                pthread_mutex_lock(&global_mutex);
+                if (balances[from] >= amount) {
+                    balances[from] -= amount;
+                    balances[to] += amount;
+                }
+
+                pthread_mutex_unlock(&global_mutex);
+            } else if (lock_type == fine_grained_mutex) {
+                int first = from < to ? from : to;
+                int second = from < to ? to : from;
+                pthread_mutex_lock(&mutexes[first]);
+                pthread_mutex_lock(&mutexes[second]);
+                if (balances[from] >= amount) {
+                    balances[from] -= amount;
+                    balances[to] += amount;
+                }
+
+                pthread_mutex_unlock(&mutexes[second]);
+                pthread_mutex_unlock(&mutexes[first]);
+            } else if (lock_type == course_grained_rw_lock) {
+                pthread_rwlock_wrlock(&global_rwlock);
+                if (balances[from] >= amount) {
+                    balances[from] -= amount;
+                    balances[to] += amount;
+                }
+
+                pthread_rwlock_unlock(&global_rwlock);
+            } else if (lock_type == fine_grained_rw_lock) {
+                int first = from < to ? from : to;
+                int second = from < to ? to : from;
+                pthread_rwlock_wrlock(&rwlocks[first]);
+                pthread_rwlock_wrlock(&rwlocks[second]);
+                if (balances[from] >= amount) {
+                    balances[from] -= amount;
+                    balances[to] += amount;
+                }
+
+                pthread_rwlock_unlock(&rwlocks[second]);
+                pthread_rwlock_unlock(&rwlocks[first]);
+            }
+        }
+    }
     return NULL;
 }
 
@@ -57,22 +145,19 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-
     n_elements = atoi(argv[1]);
     transactions_per_thread = atoi(argv[2]);
     query_percentage = atoi(argv[3]);
     lock_type = atoi(argv[4]);
     num_threads = atoi(argv[5]);
 
-    int *balances = malloc(n_elements * sizeof(int));
+    balances = malloc(n_elements * sizeof(int));
     if (!balances) {
         perror("malloc");
         return 1;
     }
 
     //lock type initialization
-
-
     if (lock_type == course_grained_mutex) {
         pthread_mutex_init(&global_mutex, NULL);
     } else if (lock_type == fine_grained_mutex) {
@@ -90,7 +175,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-
     int initial_amount_of_money = 0;    //to check correctness
 
     //shared array initialization
@@ -100,16 +184,14 @@ int main(int argc, char* argv[]) {
         initial_amount_of_money += balances[i];
     }
 
-
     pthread_t *threads = malloc(num_threads * sizeof(pthread_t));
     int *thread_args = malloc(num_threads * sizeof(int));
     if (!threads || !thread_args) { perror("malloc"); return 1; }
 
-
     double start_time = get_time();
     for (int i = 0; i < num_threads; i++) {
-        //create threads
-        if (pthread_create(&threads[i], NULL, thread_func, NULL) != 0) {
+        thread_args[i] = i;
+        if (pthread_create(&threads[i], NULL, thread_func, (void*)(uintptr_t)thread_args[i]) != 0) {
             fprintf(stderr, "Error creating thread\n");
             return EXIT_FAILURE;
         }
@@ -121,9 +203,7 @@ int main(int argc, char* argv[]) {
     double time = end_time - start_time;
     printf("Execution time: %.6f seconds\n", time);
 
-
     int final_amount_of_money = 0;    //to check correctness
-
     for (int i = 0 ; i < n_elements ; i++){
         final_amount_of_money += balances[i];
     }
@@ -132,7 +212,7 @@ int main(int argc, char* argv[]) {
     if (initial_amount_of_money != final_amount_of_money) printf("Transactions failed\n");
     else printf("Verification: PASS\n");
 
-
+    // destroy locks
     if (lock_type == course_grained_mutex) {
         pthread_mutex_destroy(&global_mutex);
     } else if (lock_type == fine_grained_mutex) {
@@ -149,5 +229,4 @@ int main(int argc, char* argv[]) {
     free(thread_args);
     free(balances);
     return(0);
-
 }

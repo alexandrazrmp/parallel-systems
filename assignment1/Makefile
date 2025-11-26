@@ -40,9 +40,8 @@ $(BIN_DIR)/barrier_condvar: $(SRC_DIR)/barriers/barrier_condvar.c | $(BIN_DIR)
 $(BIN_DIR)/shared_var_update: $(SRC_DIR)/shared_var_update.c | $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
-# NEW: bank simulation build rule
 $(BIN_DIR)/bank: $(SRC_DIR)/bank.c | $(BIN_DIR)
-	$(CC) -O3 -pthread $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@
 
 clean:
 	rm -rf $(BIN_DIR)
