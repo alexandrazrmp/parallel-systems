@@ -1,9 +1,15 @@
+/*
+ * assignment1/src/barriers/barrier_pthread.c
+ * Exercise 1.5 - pthread barrier
+ * Usage: ./bin/barrier_pthread <num_threads> <iterations>
+ *
+ * Implementation of a sense-reversal pthread barrier using pthreads.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/time.h>
-
-// Usage: ./bin/barrier_pthread <num_threads> <iterations>
 
 static double get_time(void) {
     struct timeval tv;
@@ -21,15 +27,15 @@ static pthread_barrier_t end_barrier;
 void* thread_function(void* arg) {
     (void)arg; // thread id not used
 
-    /* wait until main and all threads are ready */
+    // wait until main and all threads are ready
     pthread_barrier_wait(&start_barrier);
 
-    /* measured loop: threads synchronize among themselves on 'barrier' */
+    // measured loop: threads synchronize among themselves on 'barrier'
     for (int i = 0; i < iterations; i++) {
         pthread_barrier_wait(&barrier);
     }
 
-    /* signal completion */
+    // signal completion
     pthread_barrier_wait(&end_barrier);
     return NULL;
 }
@@ -56,7 +62,7 @@ int main(int argc, char *argv[]) {
 
     double t_init_start = get_time();
 
-    /* Initialize barriers: start and end include main (num_threads + 1), barrier is for threads only */
+    // Initialize barriers: start and end include main (num_threads + 1), barrier is for threads only
     if (pthread_barrier_init(&start_barrier, NULL, (unsigned)(num_threads + 1)) != 0) {
         perror("pthread_barrier_init start_barrier");
         return EXIT_FAILURE;
@@ -70,7 +76,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    /* Create threads; they will wait at start_barrier */
+    // Create threads; they will wait at start_barrier
     for (int i = 0; i < num_threads; i++) {
         thread_ids[i] = i;
         if (pthread_create(&threads[i], NULL, thread_function, &thread_ids[i]) != 0) {
@@ -82,11 +88,11 @@ int main(int argc, char *argv[]) {
     double t_init_end = get_time();
     printf("Initialization time: %.6f seconds\n", t_init_end - t_init_start);
 
-    /* Synchronize start: release threads and then start timer immediately after barrier returns */
+    // Synchronize start: release threads and then start timer immediately after barrier returns
     pthread_barrier_wait(&start_barrier);
     double t0 = get_time();
 
-    /* Wait for threads to finish measured loop */
+    // Wait for threads to finish measured loop
     pthread_barrier_wait(&end_barrier);
     double t1 = get_time();
 
@@ -94,7 +100,7 @@ int main(int argc, char *argv[]) {
     printf("Measured barrier loop time (threads=%d, iterations=%d): %.6f seconds\n", num_threads, iterations, measured);
     printf("Average time per barrier (all threads): %.9f seconds\n", measured / (double)iterations);
 
-    /* Join and cleanup */
+    // Join and cleanup
     for (int i = 0; i < num_threads; i++) pthread_join(threads[i], NULL);
     pthread_barrier_destroy(&start_barrier);
     pthread_barrier_destroy(&barrier);
