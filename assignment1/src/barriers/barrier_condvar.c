@@ -1,9 +1,15 @@
+/*
+ * assignment1/src/barriers/barrier_condvar.c
+ * Exercise 1.5 - condition variable barrier
+ * Usage: ./bin/barrier_condvar <num_threads> <iterations>
+ *
+ * Implementation of a sense-reversal barrier using pthread condition variables.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/time.h>
-
-// Usage: ./bin/barrier_condvar <num_threads> <iterations>
 
 static double get_time(void) {
     struct timeval tv;
