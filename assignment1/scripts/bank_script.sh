@@ -37,7 +37,7 @@ for elems in "${ELEMENTS_LIST[@]}"; do
 
           if ! echo "$out" | grep -q "Verification: PASS"; then
             echo ""
-            echo "❌ ERROR: Verification failed!"
+            echo "ERROR: Verification failed!"
             echo "Elements=$elems Transactions=$trans Query=$q Lock=$lock Run=$i"
             echo ""
             echo "Program output:"

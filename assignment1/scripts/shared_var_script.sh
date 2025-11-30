@@ -30,7 +30,7 @@ for iters in "${ITERATIONS_LIST[@]}"; do
       # ---- CHECK VERIFICATION ----
       if ! echo "$out" | grep -q "Verification: PASS"; then
         echo ""
-        echo "❌ ERROR: Verification failed!"
+        echo "ERROR: Verification failed!"
         echo "Iterations=$iters Threads=$th Run=$i"
         echo ""
         echo "Program output:"
