@@ -1,53 +1,34 @@
-#!/usr/bin/env bash
-# Simple experiment driver for assignment1/bin/array_stats
-# Usage: ./re_array_stats.sh -d "100000 1000000" -t "1 2 3 4 8" -r 5
+#!/bin/bash
+# re_array_stats.sh
 
-set -euo pipefail
+# Set output directory and file
+RESULTS_DIR="results"
+OUT_FILE="$RESULTS_DIR/raw_results_stats.csv"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASEDIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Create results directory if missing
+mkdir -p "$RESULTS_DIR"
 
-BIN="$BASEDIR/bin/array_stats"
-OUTDIR="$BASEDIR/results"
-RAW_CSV="$OUTDIR/raw_results.csv"
+# Rebuild using Make
+echo "Rebuilding..."
+make clean
+make array_stats
 
-# defaults
-SIZES=(100000 1000000)
-THREADS=(1 2 3 4 8)
-REPEATS=5
+# Stop if build fails
+if [ $? -ne 0 ]; then echo "Build failed"; exit 1; fi
 
-while getopts "d:t:r:" opt; do
-  case $opt in
-    d) IFS=' ' read -r -a SIZES <<< "$OPTARG" ;;
-    t) IFS=' ' read -r -a THREADS <<< "$OPTARG" ;;
-    r) REPEATS="$OPTARG" ;;
-    *) echo "Usage: $0 -d \"100000 1000000\" -t \"1 2 3 4 8\" -r 5"; exit 1 ;;
-  esac
+# Write CSV header
+echo "Size,Init_Time,Serial_Time,Parallel_Time,Verification" > "$OUT_FILE"
+
+# Large array sizes to ensure False Sharing is visible
+SIZES="10000000 50000000 100000000 200000000"
+
+echo "Starting experiments..."
+
+for size in $SIZES; do
+    echo "Running with array size: $size"
+    
+    # Run binary and append output to the results file
+    ./bin/array_stats $size >> "$OUT_FILE"
 done
 
-mkdir -p "$OUTDIR"
-# header: size,threads,run,init_time,serial_time,parallel_time,verification
-echo "size,threads,run,init_time,serial_time,parallel_time,verification" > "$RAW_CSV"
-
-# build binary if missing
-if [ ! -x "$BIN" ]; then
-  echo "Binary not found at $BIN — running make..."
-  (cd "$BASEDIR" && make array_stats)
-fi
-
-for n in "${SIZES[@]}"; do
-  for th in "${THREADS[@]}"; do
-    echo "Running size=$n threads=$th (repeats=$REPEATS)"
-    for ((i=1;i<=REPEATS;i++)); do
-      out="$("$BIN" "$n" "$th" 2>&1)"
-      init=$(echo "$out" | grep -i "Initialization time" | awk '{print $(NF-1)}')
-      serial=$(echo "$out" | grep -i "Serial execution time" | awk '{print $(NF-1)}')
-      parallel=$(echo "$out" | grep -i "Parallel execution time" | awk '{print $(NF-1)}')
-      ver=$(echo "$out" | grep -i "Verification" | awk '{print $2}')
-      printf "%s,%s,%d,%s,%s,%s,%s\n" "$n" "$th" "$i" "$init" "$serial" "$parallel" "$ver" >> "$RAW_CSV"
-    done
-  done
-done
-
-echo "Done. Raw results: $RAW_CSV"
-echo "To plot results use: python3 $BASEDIR/src/pr_array_stats.py $RAW_CSV"
+echo "Done. Results saved to $OUT_FILE"
