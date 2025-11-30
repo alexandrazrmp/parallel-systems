@@ -49,27 +49,27 @@ void *thread_func(void *arg) {
             // Lock depending on the approach
             if (lock_type == course_grained_mutex) {
                 pthread_mutex_lock(&global_mutex);
-                 for (volatile int i = 0; i < 1000; i++) {
+                 //for (volatile int i = 0; i < 1000; i++) {
                      // tiny busy-wait loop
-                 }
+                 //}
                 pthread_mutex_unlock(&global_mutex);
             } else if (lock_type == fine_grained_mutex) {
                 pthread_mutex_lock(&mutexes[idx]);
-                 for (volatile int i = 0; i < 1000; i++) {
+                 //for (volatile int i = 0; i < 1000; i++) {
                      // tiny busy-wait loop
-                 }
+                 //}
                 pthread_mutex_unlock(&mutexes[idx]);
             } else if (lock_type == course_grained_rw_lock) {
                 pthread_rwlock_rdlock(&global_rwlock);
-                 for (volatile int i = 0; i < 1000; i++) {
+                 //for (volatile int i = 0; i < 1000; i++) {
                      // tiny busy-wait loop
-                 }
+                 //}
                 pthread_rwlock_unlock(&global_rwlock);
             } else if (lock_type == fine_grained_rw_lock) {
                 pthread_rwlock_rdlock(&rwlocks[idx]);
-                 for (volatile int i = 0; i < 1000; i++) {
+                 //for (volatile int i = 0; i < 1000; i++) {
                      // tiny busy-wait loop
-                 }
+                 //}
 
                 pthread_rwlock_unlock(&rwlocks[idx]);
             }
