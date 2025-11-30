@@ -50,3 +50,5 @@ $(BIN_DIR)/bank: $(SRC_DIR)/bank.c | $(BIN_DIR)
 
 clean:
 	rm -rf $(BIN_DIR)
+	rm -f results/*.png
+	rm -f results/*.csv

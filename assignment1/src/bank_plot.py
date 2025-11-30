@@ -1,6 +1,10 @@
 import sys
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
+
+OUTPUT_DIR = "results"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def plot_time_vs_transactions(df):
     lock_names = {1: "Coarse Mutex", 2: "Fine Mutex", 3: "Coarse RWLock", 4: "Fine RWLock"}
@@ -21,9 +25,8 @@ def plot_time_vs_transactions(df):
         plt.title(f"Time vs Transactions (Elements={elems})")
         plt.legend()
         plt.grid(True)
-        plt.savefig(f"time_vs_transactions_elems_{elems}.png")
+        plt.savefig(f"{OUTPUT_DIR}/time_vs_transactions_elems_{elems}.png")
         plt.close()
-
 
 def plot_time_vs_elements(df):
     lock_names = {1: "Coarse Mutex", 2: "Fine Mutex", 3: "Coarse RWLock", 4: "Fine RWLock"}
@@ -44,9 +47,8 @@ def plot_time_vs_elements(df):
         plt.title(f"Time vs Elements (Transactions={trans})")
         plt.legend()
         plt.grid(True)
-        plt.savefig(f"time_vs_elements_trans_{trans}.png")
+        plt.savefig(f"{OUTPUT_DIR}/time_vs_elements_trans_{trans}.png")
         plt.close()
-
 
 def plot_time_vs_query_percentage(df):
     lock_names = {1: "Coarse Mutex", 2: "Fine Mutex", 3: "Coarse RWLock", 4: "Fine RWLock"}
@@ -63,9 +65,8 @@ def plot_time_vs_query_percentage(df):
     plt.title("Time vs Query %")
     plt.legend()
     plt.grid(True)
-    plt.savefig("time_vs_query_percentage.png")
+    plt.savefig(f"{OUTPUT_DIR}/time_vs_query_percentage.png")
     plt.close()
-
 
 def plot_lock_type_comparison(df):
     lock_names = {1: "Coarse Mutex", 2: "Fine Mutex", 3: "Coarse RWLock", 4: "Fine RWLock"}
@@ -79,13 +80,12 @@ def plot_lock_type_comparison(df):
     plt.grid(axis="y")
     plt.xticks(rotation=15)
     plt.tight_layout()
-    plt.savefig("lock_type_comparison.png")
+    plt.savefig(f"{OUTPUT_DIR}/lock_type_comparison.png")
     plt.close()
-
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python3 bank_plot.py <csv_file>")
+        print("Usage: python3 shared_var_plot.py <csv_file>")
         sys.exit(1)
 
     csv_file = sys.argv[1]
@@ -98,8 +98,7 @@ def main():
     plot_time_vs_query_percentage(df)
     plot_lock_type_comparison(df)
 
-    print("Done. PNG files saved in working directory.")
-
+    print("Done. PNG files saved in results/.")
 
 if __name__ == "__main__":
     main()

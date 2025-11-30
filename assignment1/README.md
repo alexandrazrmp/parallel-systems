@@ -58,10 +58,12 @@ Run experiments:
 ./scripts/shared_var_script.sh
 ```
 
+Output: `results/raw_results.csv`
+
 Generate plots:
 
 ```bash
-python3 src/shared_var_plot.py
+python3 src/shared_var_plot.py results/raw_results.csv
 ```
 
 ### Exercise 3 – Array Analysis (False Sharing)
@@ -88,10 +90,12 @@ Run experiments:
 ./scripts/bank_script.sh
 ```
 
+Output: `results/raw_results.csv`
+
 Generate plots:
 
 ```bash
-python3 src/bank_plot.py
+python3 src/bank_plot.py results/raw_results.csv
 ```
 
 ### Exercise 5 – Barriers
