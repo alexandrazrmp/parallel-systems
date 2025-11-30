@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Simple experiment driver for assignment1/bin/poly_mult
-# Usage: ./run_experiments.sh -d "100000 1000000" -t "1 2 4 8" -r 4
+# Usage: ./run_experiments.sh -d "10000 100000" -t "1 2 4 8" -r 4
 
 set -euo pipefail
 
@@ -13,7 +13,7 @@ OUTDIR="$BASEDIR/results"
 RAW_CSV="$OUTDIR/raw_results.csv"
 
 # default parameters
-DEGREES=(100000 1000000)
+DEGREES=(10000 100000)
 THREADS=(1 2 4 8)
 REPEATS=4
 
