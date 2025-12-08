@@ -3,8 +3,8 @@ CC = gcc
 CFLAGS = -O2 -Wall -pthread
 BIN_DIR = bin
 SRC_DIR = src
-TARGET = $(BIN_DIR)/poly_mult
-SRCS = $(SRC_DIR)/poly_mult.c
+TARGET = $(BIN_DIR)/poly_mult  $(BIN_DIR)/mergesort $(BIN_DIR)/sparse_matrix_vector_mult
+SRCS = $(SRC_DIR)/poly_mult.c $(SRC_DIR)/mergesort.c $(SRC_DIR)/sparse_matrix_vector_mult.c
 
 .PHONY: all clean
 
