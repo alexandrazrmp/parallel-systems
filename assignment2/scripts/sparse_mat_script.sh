@@ -9,14 +9,10 @@ OUTDIR="$BASEDIR/results"
 RAW_CSV="$OUTDIR/raw_results.csv"
 
 # Experiment parameters
-MATRIX_SIZES=(1000)
-# 2000 5000 10000)
-SPARSITY_LIST=(0)
-# 10 30 50 70 90 100)
-ITERATIONS_LIST=(1 )
-#5 10 20)
-THREADS_LIST=(1)
-# 2 4 8)
+MATRIX_SIZES=(1000 2000 5000 10000)
+SPARSITY_LIST=(0 10 30 50 70 90 100)
+ITERATIONS_LIST=(1 5 10 20)
+THREADS_LIST=(1 2 4 8)
 REPEATS=3
 
 mkdir -p "$OUTDIR"
@@ -55,3 +51,6 @@ for N in "${MATRIX_SIZES[@]}"; do
 done
 
 echo "Experiments completed. Results saved to $RAW_CSV"
+echo ""
+echo "To plot results, run:"
+echo "python3 \"$BASEDIR/src/sparse_mat_plot.py\" \"$RAW_CSV\""

@@ -1,39 +1,75 @@
-#!/usr/bin/env python3
+import sys
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-import os
 
-sns.set(style="whitegrid")
-csv_file = "results/raw_results.csv"
-df = pd.read_csv(csv_file)
+csv = sys.argv[1]
+df = pd.read_csv(csv)
 
-# Average over repeats
-df_avg = df.groupby(['N','sparsity','iterations','threads']).mean().reset_index()
+# Pre-average: only average repeated runs
+df = df.groupby(["N", "sparsity", "iterations", "threads"], as_index=False).mean()
 
-outdir = "results/plots"
-os.makedirs(outdir, exist_ok=True)
+# ------------------------------
+# 1) Sparsity vs Time for each matrix size
+# ------------------------------
+matrix_sizes = sorted(df["N"].unique())
 
-# Plot CSR vs Dense times, plus breakdown of CSR
-for N in df_avg['N'].unique():
-    for sparsity in df_avg['sparsity'].unique():
-        subset = df_avg[(df_avg['N']==N) & (df_avg['sparsity']==sparsity)]
-        if subset.empty:
-            continue
+for N in matrix_sizes:
+    # Fix N, average across all iterations & threads
+    sub = df[df["N"] == N].groupby("sparsity", as_index=False).mean()
 
-        plt.figure(figsize=(8,6))
-        plt.plot(subset['threads'], subset['CSR_total_time'], marker='o', label='CSR Total')
-        plt.plot(subset['threads'], subset['Dense_time'], marker='o', label='Dense')
-        plt.fill_between(subset['threads'], 0, subset['CSR_formation_time'], color='orange', alpha=0.3, label='CSR Formation')
-        plt.fill_between(subset['threads'], subset['CSR_formation_time'], subset['CSR_total_time'], color='blue', alpha=0.3, label='CSR Multiplication')
-        plt.title(f'Matrix Size={N}, Sparsity={sparsity}%')
-        plt.xlabel('Threads')
-        plt.ylabel('Time (seconds)')
-        plt.legend()
-        plt.xticks(subset['threads'])
-        plt.grid(True)
-        plt.tight_layout()
-        plt.savefig(os.path.join(outdir, f'perf_N{N}_S{sparsity}.png'))
-        plt.close()
+    plt.figure()
+    plt.plot(sub["sparsity"], sub["CSR_total_time"], marker='o', label="CSR Total Time")
+    plt.plot(sub["sparsity"], sub["Dense_time"], marker='o', label="Dense Time")
 
-print(f"✅ Plots saved in {outdir}")
+    plt.xlabel("Sparsity (%)")
+    plt.ylabel("Avg Execution Time (s)")
+    plt.title(f"Sparsity vs Execution Time — N={N}")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(f"results/plot_sparsity_N{N}.png")
+    plt.close()
+
+# ------------------------------
+# 2) Iterations vs Time (N0, sparsity=70%)
+# ------------------------------
+N0 = matrix_sizes[0]
+sub_70 = df[(df["N"] == N0) & (df["sparsity"] == 70)]
+
+# Fix N, sparsity → average over threads
+iter_curve = sub_70.groupby("iterations", as_index=False).mean()
+
+plt.figure()
+plt.plot(iter_curve["iterations"], iter_curve["CSR_total_time"], marker='o', label="CSR Total Time")
+plt.plot(iter_curve["iterations"], iter_curve["Dense_time"], marker='o', label="Dense Time")
+
+plt.xlabel("Iterations")
+plt.ylabel("Execution Time (s)")
+plt.title(f"Iterations vs Time — N={N0}, Sparsity=70%")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.savefig(f"results/plot_iterations_N{N0}_s70.png")
+plt.close()
+
+# ------------------------------
+# 3) Threads vs Time (N0, sparsity=70%)
+# ------------------------------
+
+# Fix N, sparsity → average over iterations
+thread_curve = sub_70.groupby("threads", as_index=False).mean()
+
+plt.figure()
+plt.plot(thread_curve["threads"], thread_curve["CSR_total_time"], marker='o', label="CSR Total Time")
+plt.plot(thread_curve["threads"], thread_curve["Dense_time"], marker='o', label="Dense Time")
+
+plt.xlabel("Threads")
+plt.ylabel("Execution Time (s)")
+plt.title(f"Threads vs Time — N={N0}, Sparsity=70%")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.savefig(f"results/plot_threads_N{N0}_s70.png")
+plt.close()
+
+print("Clean plots created in results/")
