@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <omp.h>
 #include <sys/time.h>
+#include <string.h>
+#include <time.h>
 
 // Function to get the current time in seconds
 double get_time() {
@@ -33,6 +35,8 @@ int main(int argc, char *argv[]) {
         printf("Wrong Input\n");
         return 1;
     }
+
+    srand(time(NULL));
 
     //generate random matrix and random vector
     int **a;
@@ -108,6 +112,10 @@ int main(int argc, char *argv[]) {
     printf("CRS formation time: %f seconds\n", t2-t1);
 
 
+    //save original x for dense multiplication
+    int *x_orig = malloc(N * sizeof(int));
+    memcpy(x_orig, x, N*sizeof(int));
+
     //sparce multiplication
     int *y = malloc(N * sizeof(int));
 
@@ -130,35 +138,58 @@ int main(int argc, char *argv[]) {
 
     double t4 = get_time();
     printf("CSR multiplication time: %f seconds\n", t4 - t3);
-    printf("TOTAL CSR time: %f seconds\n", t4 - t1);
+    printf("TOTAL CSR time: %f seconds\n", t4 - t3 + t2 - t1);
+
+
+    //reset x
+    memcpy(x, x_orig, N*sizeof(int));
 
     //dense multiplication
+
+    int *z = malloc(N * sizeof(int));
+
     double t5 = get_time();
 
     for (int iter = 0; iter < iterations; iter++) {
-
-        #pragma omp parallel for
         for (int i = 0; i < N; i++) {
-            long sum = 0;
+            int sum = 0;
             for (int j = 0; j < N; j++)
                 sum += a[i][j] * x[j];
-            y[i] = sum;
+            z[i] = sum;
         }
 
         int *tmp = x;
-        x = y;
-        y = tmp;
+        x = z;
+        z = tmp;
     }
 
     double t6 = get_time();
     printf("Dense multiplication time: %f seconds\n", t6 - t5);
 
 
+    //checking program correctness
+    int correct = 1;
+
+    for (int i = 0; i < N; i++) {
+        if (y[i] != z[i]) { //compare last iteration results
+            correct = 0;
+            break;
+        }
+    }
+
+    if (correct) 
+        printf("Verification: PASS\n");
+    else 
+        printf("Verification: FAILED\n");
+
+
     //free allocated memory
     for (int i = 0 ; i < N ; i++) free(a[i]);
     free(a);
     free(x);
+    free(x_orig);
     free(y);
+    free(z);
     free(nze_per_line);
     free(row_index);
     free(v);
