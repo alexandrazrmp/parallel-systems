@@ -8,7 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>        // OpenMP header
+#include <omp.h>
 #include <stdint.h>
 #include <sys/time.h>
 
