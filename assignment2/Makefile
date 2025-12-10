@@ -26,3 +26,4 @@ $(BIN_DIR)/mergesort_omp: $(SRC_DIR)/mergesort_omp.c
 
 clean:
 	rm -rf $(BIN_DIR)
+	rm -f $(RESULTS_DIR)/plot*
