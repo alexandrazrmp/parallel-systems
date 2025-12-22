@@ -13,7 +13,7 @@ OUTDIR="$BASEDIR/results"
 CSV_FILE="$OUTDIR/results.csv"
 
 # Experiment parameters
-DEGREES=(10000 50000 100000 1000000)  # Polynomial degrees
+DEGREES=(10000 50000 100000 500000)  # Polynomial degrees
 THREADS=(1 2 4 8)             # Thread counts to test
 REPEATS=3                     # Repeats for average
 

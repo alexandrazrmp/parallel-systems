@@ -39,15 +39,15 @@ All commands below assume you are inside `assignment2/`.
 Run experiments:
 
 ```bash
-./scripts/run_experiments.sh
+./scripts/re_poly_mult.sh
 ```
 
-Output: `results/raw_results.csv`
+Output: `results/results.csv`
 
 Generate plots:
 
 ```bash
-python3 src/plot_results.py results/raw_results.csv
+python3 src/plot_results.py results/results.csv
 ```
 
 ### Exercise 2 – Sparse Matrix-Vector Multiplication
@@ -55,7 +55,7 @@ python3 src/plot_results.py results/raw_results.csv
 Run experiments:
 
 ```bash
-./scripts/
+./scripts/sparse_mat_script.sh
 ```
 
 Output: `results/raw_results.csv`
@@ -63,7 +63,7 @@ Output: `results/raw_results.csv`
 Generate plots:
 
 ```bash
-python3 src/             results/raw_results.csv
+python3 src/sparse_mat_plot.py results/raw_results.csv
 ```
 
 ### Exercise 3 – Parallel Mergesort
@@ -71,15 +71,15 @@ python3 src/             results/raw_results.csv
 Run experiments:
 
 ```bash
-./scripts/
+./scripts/re_mergesort.sh
 ```
 
-Output: `results/raw_results_stats.csv`
+Output: `results/results3.csv`
 
 Generate plots:
 
 ```bash
-python3 src/
+python3 src/plot_mergesort.py results/results3.csv
 ```
 
 ## 4. Directory Structure
