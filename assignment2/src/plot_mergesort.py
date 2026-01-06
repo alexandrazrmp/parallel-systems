@@ -166,6 +166,55 @@ def main():
     plt.savefig(os.path.join(out_dir, "plot_serial_vs_parallel.png"), dpi=300)
     plt.close()
 
+    # -------------------------------
+    # Plot 6: Speedup vs N (fixed threads)
+    # -------------------------------
+    plt.figure(figsize=(10, 6))
+
+    for th in fixed_threads:
+        Ns = []
+        speedups = []
+        for N, data in plot_data.items():
+            if th in data["threads"]:
+                idx = data["threads"].index(th)
+                Ns.append(N)
+                speedups.append(data["speedup"][idx])
+
+        plt.plot(Ns, speedups, marker='o', label=f'{th} threads')
+
+    plt.xlabel("Array Size (N)")
+    plt.ylabel("Speedup")
+    plt.title("Speedup vs Array Size")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(os.path.join(out_dir, "plot_speedup_vs_N.png"), dpi=300)
+    plt.close()
+
+        # -------------------------------
+    # Plot 7: Efficiency vs N (fixed threads)
+    # -------------------------------
+    plt.figure(figsize=(10, 6))
+
+    for th in fixed_threads:
+        Ns = []
+        efficiencies = []
+        for N, data in plot_data.items():
+            if th in data["threads"]:
+                idx = data["threads"].index(th)
+                Ns.append(N)
+                efficiencies.append(data["efficiency"][idx])
+
+        plt.plot(Ns, efficiencies, marker='o', label=f'{th} threads')
+
+    plt.xlabel("Array Size (N)")
+    plt.ylabel("Efficiency")
+    plt.title("Parallel Efficiency vs Array Size")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(os.path.join(out_dir, "plot_efficiency_vs_N.png"), dpi=300)
+    plt.close()
+
+
     print(f"All plots saved in: {out_dir}")
 
 if __name__ == "__main__":
