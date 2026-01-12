@@ -13,13 +13,13 @@ int main(int argc, char** argv) {
 
     gethostname(hostname, 256);
 
-    printf("[poly_mult] Rank %d of %d running on %s\n",
+    printf("[sparse_mv] Rank %d of %d running on %s\n",
            rank, size, hostname);
 
     MPI_Barrier(MPI_COMM_WORLD);
 
     if (rank == 0) {
-        printf("[poly_mult] All processes finished successfully.\n");
+        printf("[sparse_mv] All processes finished successfully.\n");
     }
 
     MPI_Finalize();

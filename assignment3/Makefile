@@ -1,21 +1,26 @@
+MPICC = mpicc
+CFLAGS = -O2 -Wall
 
-CC = gcc
-CFLAGS = -O2 -Wall -pthread
 BIN_DIR = bin
 SRC_DIR = src
-TARGET = $(BIN_DIR)/poly_mult
-SRCS = $(SRC_DIR)/poly_mult.c
 
-.PHONY: all clean
+TARGETS = $(BIN_DIR)/poly_mult \
+          $(BIN_DIR)/sparse_matrix_vector_mult \
+		  $(BIN_DIR)/mpihello
 
-all: $(TARGET)
+all: $(TARGETS)
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-$(TARGET): $(SRCS) | $(BIN_DIR)
-	$(CC) $(CFLAGS) $^ -o $@
+$(BIN_DIR)/mpihello: $(SRC_DIR)/mpihello.c | $(BIN_DIR)
+	$(MPICC) $(CFLAGS) -o $@ $<
+
+$(BIN_DIR)/poly_mult: $(SRC_DIR)/poly_mult.c | $(BIN_DIR)
+	$(MPICC) $(CFLAGS) -o $@ $<
+
+$(BIN_DIR)/sparse_matrix_vector_mult: $(SRC_DIR)/sparse_matrix_vector_mult.c | $(BIN_DIR)
+	$(MPICC) $(CFLAGS) -o $@ $<
 
 clean:
-	rm -rf $(BIN_DIR)
-
+	rm -f $(BIN_DIR)/*
