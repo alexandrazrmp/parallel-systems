@@ -12,7 +12,7 @@ int main(void) {
 
 
    /* Start up MPI */
-   MPI_Init(NULL, NULL); 
+   MPI_Init(NULL, NULL);   //ARGC ARGV
 
    /* Get the number of processes */
    MPI_Comm_size(MPI_COMM_WORLD, &comm_sz); 
