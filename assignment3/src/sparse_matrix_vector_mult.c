@@ -14,9 +14,6 @@
 #include <sys/time.h>
 #include <string.h>
 
-/////////////////////////////////////////////////////////////////////////////////////////to delete
-const int MAX_STRING = 1024;
-/////////////////////////////////////////////////////////////////////////////////////////end of delete
 
 // Function to get the current time in seconds
 double get_time() {
@@ -55,34 +52,6 @@ int main(int argc, char** argv) {
 
     //get total number of processes
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-
-
-/////////////////////////////////////////////////////////////////////to delete
-   char       greeting[MAX_STRING];  /* String storing message */
-   char hostname[512];
-   gethostname(hostname, 512);
-
-   if (rank != 0) { 
-      /* Create message */
-      sprintf(greeting, "Greetings from process %d of %d - %s!", 
-            rank, size, hostname);
-      /* Send message to process 0 */
-      MPI_Send(greeting, strlen(greeting)+1, MPI_CHAR, 0, 0,
-            MPI_COMM_WORLD); 
-   } else {  
-      /* Print my message */
-      printf("Greetings from process %d of %d - %s!\n", rank, size, hostname);
-      for (int q = 1; q < size; q++) {
-         /* Receive message from process q */
-         MPI_Recv(greeting, MAX_STRING, MPI_CHAR, q,
-            0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-         /* Print message from process q */
-         printf("%s\n", greeting);
-      } 
-   }
-
-//////////////////////////////////////////////////////////////////////end of delete
 
     /* Dense matrix and vectors (only fully used by rank 0) */
     int **A = NULL;
@@ -310,6 +279,9 @@ int main(int argc, char** argv) {
     int *local_y = malloc(local_rows * sizeof(int));
     int *x_next = malloc(N * sizeof(int));  // temp vector for next iteration
 
+    int *x_parallel_csr = malloc(N * sizeof(int));
+    memcpy(x_parallel_csr, x, N * sizeof(int));
+
     /* --- Start iterations --- */
     for (int it = 0; it < iters; it++) {
 
@@ -317,7 +289,7 @@ int main(int argc, char** argv) {
         for (int i = 0; i < local_rows; i++) {
             int sum = 0;
             for (int k = local_row_ptr[i]; k < local_row_ptr[i+1]; k++) {
-                sum += local_values[k] * x[local_col_idx[k]];
+                sum += local_values[k] * x_parallel_csr[local_col_idx[k]];
             }
             local_y[i] = sum;
         }
@@ -345,8 +317,8 @@ int main(int argc, char** argv) {
         MPI_Bcast(x_next, N, MPI_INT, 0, MPI_COMM_WORLD);
 
         // swap pointers for next iteration
-        int *tmp = x;
-        x = x_next;
+        int *tmp = x_parallel_csr;
+        x_parallel_csr = x_next;
         x_next = tmp;
 
         if (rank == 0) {
@@ -361,7 +333,7 @@ int main(int argc, char** argv) {
 
     if (rank == 0) {
         y_csr_parallel = malloc(N * sizeof(int));
-        memcpy(y_csr_parallel, x, N * sizeof(int));
+        memcpy(y_csr_parallel, x_parallel_csr, N * sizeof(int));
     }
 
     // CSR local arrays
@@ -370,7 +342,7 @@ int main(int argc, char** argv) {
     free(local_values);
     free(local_y);
     free(x_next);
-
+    free(x_parallel_csr);
 
     //parallel dense message send
 
@@ -518,48 +490,6 @@ int main(int argc, char** argv) {
             printf("All results are correct!\n");
         else
             printf("ERROR: Results do not match!\n");
-
-
-////////////////////////////////////////////////////////////////////////////////////////// to delete
-        correct = 1;
-        for (int i = 0; i < N; i++) {
-            if (y_serial[i] != y_csr_serial[i]) {
-                correct = 0;
-                break;
-            }
-        }
-        if (correct) 
-            printf("y dense serial and y csr serial OKAY\n");
-        else
-            printf("ERROR: Results do not match!\n");
-
-        
-        correct = 1;
-        for (int i = 0; i < N; i++) {
-            if (y_serial[i] != y_dense_parallel[i]) {
-                correct = 0;
-                break;
-            }
-        }
-        if (correct) 
-            printf("y dense serial and y DENSE PARALLEL OKAY\n");
-        else
-            printf("ERROR: Results do not match!\n");
-
-        correct = 1;
-        for (int i = 0; i < N; i++) {
-            if ( y_serial[i] != y_csr_parallel[i]) {
-                correct = 0;
-                break;
-            }
-        }
-        if (correct) 
-            printf("y dense serial and y CSR PARALLEL OKAY\n");
-        else
-            printf("ERROR: Results do not match!\n");
-
-
-/////////////////////////////////////////////////////////////////////////////////////////// end of deleting
 
 
         //free allocated memory
