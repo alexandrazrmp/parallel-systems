@@ -58,8 +58,9 @@ plt.savefig(OUTDIR / "total_vs_size.png")
 plt.close()
 
 # ------------------------------
-# 4️⃣ Parallel CSR scaling breakdown (CSR only)
+# 4️⃣ Parallel scaling breakdown
 # ------------------------------
+# CSR breakdown: Construction, Message Send, Multiply, Total
 plt.figure(figsize=(8,6))
 df_csr = df_avg.groupby("processes")[["CSR_construction","CSR_msg_send","CSR_parallel","Total_parallel_CSR"]].mean()
 df_csr.plot(marker='o', ax=plt.gca())
@@ -69,6 +70,18 @@ plt.title("Parallel CSR: Breakdown vs Processes")
 plt.grid(True)
 plt.legend(["Construction","Message Send","Multiply","Total"])
 plt.savefig(OUTDIR / "parallel_csr_breakdown.png")
+plt.close()
+
+# Dense breakdown: Message Send, Multiply, Total
+plt.figure(figsize=(8,6))
+df_dense = df_avg.groupby("processes")[["dense_message_send_time","dense_mult_time","Parallel_dense"]].mean()
+df_dense.plot(marker='o', ax=plt.gca())
+plt.xlabel("Processes")
+plt.ylabel("Time (s)")
+plt.title("Parallel Dense: Breakdown vs Processes")
+plt.grid(True)
+plt.legend(["Message Send","Multiply","Total"])
+plt.savefig(OUTDIR / "parallel_dense_breakdown.png")
 plt.close()
 
 print("✅ All 4 main plots saved in results/plots/")
