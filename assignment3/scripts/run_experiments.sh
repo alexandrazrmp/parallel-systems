@@ -17,11 +17,11 @@ mkdir -p "$OUTDIR"
 MATRIX_SIZES=(1000 5000 10000)
 SPARSITY_LIST=(0 25 50 75 99)
 ITERATIONS_LIST=(1 5 10 20)
-PROCS_LIST=(4 8 16)
+PROCS_LIST=(4 8 16 32)
 REPEATS=4
 
 # ---------- CSV Header ----------
-echo "N,sparsity,iterations,processes,run,CSR_construction,CSR_msg_send,CSR_parallel,Total_parallel_CSR,Total_serial_CSR,Parallel_dense,Serial_dense" > "$RAW_CSV"
+echo "N,sparsity,iterations,processes,run,CSR_construction,CSR_msg_send,CSR_parallel,Total_parallel_CSR,Total_serial_CSR,Dense_msg_send,Dense_parallel,Total_parallel_dense,Total_serial_dense" > "$RAW_CSV"
 
 # ---------- Helper: Extract Time ----------
 extract_time() {
@@ -51,17 +51,24 @@ for N in "${MATRIX_SIZES[@]}"; do
               exit 1
           fi
 
+          # Extract CSR times
           CSR_CONS=$(extract_time "$OUT" "CSR construction time")
           CSR_MSG=$(extract_time "$OUT" "CSR message send time")
           CSR_PAR=$(extract_time "$OUT" "CSR parallel multiplication time")
           TOTAL_CSR=$(extract_time "$OUT" "Total parallel CSR time")
           TOTAL_CSR_SER=$(extract_time "$OUT" "Total serial CSR time")
-          DENSE_PAR=$(extract_time "$OUT" "Total parallel dense time")
-          DENSE_SER=$(extract_time "$OUT" "Total serial dense time")
 
-          printf "%d,%d,%d,%d,%d,%s,%s,%s,%s,%s,%s,%s\n" \
+          # Extract Dense times
+          DENSE_MSG=$(extract_time "$OUT" "Dense message send time")
+          DENSE_PAR=$(extract_time "$OUT" "Dense parallel multiplication time")
+          TOTAL_DENSE=$(extract_time "$OUT" "Total parallel dense time")
+          TOTAL_DENSE_SER=$(extract_time "$OUT" "Total serial dense time")
+
+          # Append to CSV
+          printf "%d,%d,%d,%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" \
             "$N" "$SP" "$IT" "$P" "$run" \
-            "$CSR_CONS" "$CSR_MSG" "$CSR_PAR" "$TOTAL_CSR" "$TOTAL_CSR_SER" "$DENSE_PAR" "$DENSE_SER" \
+            "$CSR_CONS" "$CSR_MSG" "$CSR_PAR" "$TOTAL_CSR" "$TOTAL_CSR_SER" \
+            "$DENSE_MSG" "$DENSE_PAR" "$TOTAL_DENSE" "$TOTAL_DENSE_SER" \
             >> "$RAW_CSV"
         done
       done

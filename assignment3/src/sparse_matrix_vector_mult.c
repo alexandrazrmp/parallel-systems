@@ -469,6 +469,8 @@ int main(int argc, char** argv) {
         printf("CSR parallel multiplication time: %.6f s\n", CSR_mult_time);
         printf("Total parallel CSR time: %.6f s\n", total_CSR);
         printf("Total serial CSR time: %.6f s\n", total_CSR_serial);
+        printf("Dense message send time: %.6f s\n", dense_message_send_time);
+        printf("Dense parallel multiplication time: %.6f s\n", dense_mult_time);
         printf("Total parallel dense time: %.6f s\n", total_dense);
         printf("Total serial dense time: %.6f s\n", total_dense_serial);
 
