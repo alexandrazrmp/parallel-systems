@@ -282,17 +282,6 @@ int main(int argc, char** argv) {
     int *x_parallel_csr = malloc(N * sizeof(int));
     memcpy(x_parallel_csr, x, N * sizeof(int));
 
-
-    // Prepare gather metadata ONCE (not every iteration)
-    int *recv_counts = malloc(size * sizeof(int));
-    int *recv_displs = malloc(size * sizeof(int));
-
-    for (int p = 0; p < size; p++) {
-        int s = p * rows;
-        int e = (p == size - 1) ? N : s + rows;
-        recv_counts[p] = e - s;
-        recv_displs[p] = s;
-    }
     /* --- Start iterations --- */
     for (int it = 0; it < iters; it++) {
 
@@ -305,52 +294,41 @@ int main(int argc, char** argv) {
             local_y[i] = sum;
         }
 
-        // /* --- Gather all local results to rank 0 --- */
-        // // use MPI_Gatherv for different row sizes (last process may have more rows)
-        // int *recv_counts = NULL;
-        // int *recv_displs = NULL;
-        // if (rank == 0) {
-        //     recv_counts = malloc(size * sizeof(int));
-        //     recv_displs = malloc(size * sizeof(int));
-        //     for (int p = 0; p < size; p++) {
-        //         int s = p * rows;
-        //         int e = (p == size-1) ? N : s + rows;
-        //         recv_counts[p] = e - s;
-        //         recv_displs[p] = s;
-        //     }
-        // }
+        /* --- Gather all local results to rank 0 --- */
+        // use MPI_Gatherv for different row sizes (last process may have more rows)
+        int *recv_counts = NULL;
+        int *recv_displs = NULL;
+        if (rank == 0) {
+            recv_counts = malloc(size * sizeof(int));
+            recv_displs = malloc(size * sizeof(int));
+            for (int p = 0; p < size; p++) {
+                int s = p * rows;
+                int e = (p == size-1) ? N : s + rows;
+                recv_counts[p] = e - s;
+                recv_displs[p] = s;
+            }
+        }
 
-        // MPI_Gatherv(local_y, local_rows, MPI_INT,
-        //             x_next, recv_counts, recv_displs, MPI_INT,
-        //             0, MPI_COMM_WORLD);
-
-        // /* --- Broadcast updated vector for next iteration --- */
-        // MPI_Bcast(x_next, N, MPI_INT, 0, MPI_COMM_WORLD);
-
-        // // swap pointers for next iteration
-        // int *tmp = x_parallel_csr;
-        // x_parallel_csr = x_next;
-        // x_next = tmp;
-
-
-
-        /* --- All processes collect the full vector --- */
-        MPI_Allgatherv(local_y, local_rows, MPI_INT,
+        MPI_Gatherv(local_y, local_rows, MPI_INT,
                     x_next, recv_counts, recv_displs, MPI_INT,
-                    MPI_COMM_WORLD);
+                    0, MPI_COMM_WORLD);
 
+        /* --- Broadcast updated vector for next iteration --- */
+        MPI_Bcast(x_next, N, MPI_INT, 0, MPI_COMM_WORLD);
+
+        // swap pointers for next iteration
         int *tmp = x_parallel_csr;
         x_parallel_csr = x_next;
         x_next = tmp;
 
-
+        if (rank == 0) {
+            free(recv_counts);
+            free(recv_displs);
+        }
     }
 
     t1 = get_time();
     CSR_mult_time = t1 - t0;
-
-    free(recv_counts);
-    free(recv_displs);
 
 
     if (rank == 0) {
@@ -365,7 +343,6 @@ int main(int argc, char** argv) {
     free(local_y);
     free(x_next);
     free(x_parallel_csr);
-
 
     //parallel dense message send
 
@@ -424,9 +401,8 @@ int main(int argc, char** argv) {
 
     if (rank == 0) {
         y_dense_parallel = malloc(N * sizeof(int));
+        memcpy(x_next_dense, x, N * sizeof(int));
     }
-
-    memcpy(x_next_dense, x, N * sizeof(int));
 
     for (int it = 0; it < iters; it++) {
         for (int i = 0; i < local_dense_rows; i++) {

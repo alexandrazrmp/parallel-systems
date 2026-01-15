@@ -193,7 +193,7 @@ int main(int argc, char** argv) {
 
     //parallel CSR message send (OPTIMAL)
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    // MPI_Barrier(MPI_COMM_WORLD);
     t0 = get_time();
 
     //decide row ownership 
@@ -272,7 +272,7 @@ int main(int argc, char** argv) {
 
     //parallel CSR multiplication
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    // MPI_Barrier(MPI_COMM_WORLD);
     t0 = get_time();
 
     /* --- Allocate local result vector --- */
@@ -282,9 +282,20 @@ int main(int argc, char** argv) {
     int *x_parallel_csr = malloc(N * sizeof(int));
     memcpy(x_parallel_csr, x, N * sizeof(int));
 
+
+    // Prepare gather metadata ONCE (not every iteration)
+    int *recv_counts = malloc(size * sizeof(int));
+    int *recv_displs = malloc(size * sizeof(int));
+
+    for (int p = 0; p < size; p++) {
+        int s = p * rows;
+        int e = (p == size - 1) ? N : s + rows;
+        recv_counts[p] = e - s;
+        recv_displs[p] = s;
+    }
     /* --- Start iterations --- */
     for (int it = 0; it < iters; it++) {
-
+        // MPI_Barrier(MPI_COMM_WORLD);
         // Compute local SpMV
         for (int i = 0; i < local_rows; i++) {
             int sum = 0;
@@ -294,47 +305,33 @@ int main(int argc, char** argv) {
             local_y[i] = sum;
         }
 
-        /* --- Gather all local results to rank 0 --- */
-        // use MPI_Gatherv for different row sizes (last process may have more rows)
-        int *recv_counts = NULL;
-        int *recv_displs = NULL;
-        if (rank == 0) {
-            recv_counts = malloc(size * sizeof(int));
-            recv_displs = malloc(size * sizeof(int));
-            for (int p = 0; p < size; p++) {
-                int s = p * rows;
-                int e = (p == size-1) ? N : s + rows;
-                recv_counts[p] = e - s;
-                recv_displs[p] = s;
-            }
-        }
 
-        MPI_Gatherv(local_y, local_rows, MPI_INT,
+        /* --- All processes collect the full vector --- */
+        MPI_Allgatherv(local_y, local_rows, MPI_INT,
                     x_next, recv_counts, recv_displs, MPI_INT,
-                    0, MPI_COMM_WORLD);
-
-        /* --- Broadcast updated vector for next iteration --- */
-        MPI_Bcast(x_next, N, MPI_INT, 0, MPI_COMM_WORLD);
-
-        // swap pointers for next iteration
+                    MPI_COMM_WORLD);
+        // MPI_Barrier(MPI_COMM_WORLD);
         int *tmp = x_parallel_csr;
         x_parallel_csr = x_next;
         x_next = tmp;
 
-        if (rank == 0) {
-            free(recv_counts);
-            free(recv_displs);
-        }
+
     }
 
     t1 = get_time();
     CSR_mult_time = t1 - t0;
 
+    free(recv_counts);
+    free(recv_displs);
+
 
     if (rank == 0) {
         y_csr_parallel = malloc(N * sizeof(int));
         memcpy(y_csr_parallel, x_parallel_csr, N * sizeof(int));
+        free(nnz_counts);
+        free(nnz_displs);
     }
+
 
     // CSR local arrays
     free(local_row_ptr);
@@ -344,24 +341,26 @@ int main(int argc, char** argv) {
     free(x_next);
     free(x_parallel_csr);
 
+
     //parallel dense message send
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    // MPI_Barrier(MPI_COMM_WORLD);
     t0 = get_time();
 
     // Decide row ownership
-     rows = N / size;
-     start = rank * rows;
-     end   = (rank == size - 1) ? N : start + rows;
+    rows  = N / size;
+    start = rank * rows;
+    end   = (rank == size - 1) ? N : start + rows;
     int local_dense_rows = end - start;
 
+    // Allocate local flattened matrix
     int *local_A_flat = malloc(local_dense_rows * N * sizeof(int));
+
+    // Prepare scatter metadata on rank 0
     int *dense_row_counts = NULL;
     int *dense_row_displs = NULL;
-    int *flat_A = NULL;
-
     if (rank == 0) {
-        flat_A = malloc(N * N * sizeof(int));
+        int *flat_A = malloc(N * N * sizeof(int));
         for (int i = 0; i < N; i++)
             memcpy(&flat_A[i * N], A[i], N * sizeof(int));
 
@@ -370,97 +369,93 @@ int main(int argc, char** argv) {
         for (int p = 0; p < size; p++) {
             int s = p * rows;
             int e = (p == size - 1) ? N : s + rows;
-            dense_row_counts[p] = (e - s) * N;
-            dense_row_displs[p] = s * N;
+            dense_row_counts[p] = (e - s) * N; // number of elements
+            dense_row_displs[p] = s * N;       // offset in flattened array
         }
+
+        MPI_Scatterv(flat_A, dense_row_counts, dense_row_displs, MPI_INT,
+                    local_A_flat, local_dense_rows * N, MPI_INT,
+                    0, MPI_COMM_WORLD);
+
+        free(flat_A);
+    } else {
+        MPI_Scatterv(NULL, NULL, NULL, MPI_INT,
+                    local_A_flat, local_dense_rows * N, MPI_INT,
+                    0, MPI_COMM_WORLD);
     }
 
-    MPI_Scatterv(flat_A,
-                dense_row_counts,
-                dense_row_displs,
-                MPI_INT,
-                local_A_flat,
-                local_dense_rows * N,
-                MPI_INT,
-                0,
-                MPI_COMM_WORLD);
-
-    if (rank == 0) free(flat_A);
-    if (rank != 0 && x == NULL) x = malloc(N * sizeof(int));
+    // Broadcast initial vector x to all ranks
+    if (x == NULL) x = malloc(N * sizeof(int));
     MPI_Bcast(x, N, MPI_INT, 0, MPI_COMM_WORLD);
 
     t1 = get_time();
     dense_message_send_time = t1 - t0;
 
     //parallel dense multiplication
-    MPI_Barrier(MPI_COMM_WORLD);
+    // MPI_Barrier(MPI_COMM_WORLD);
     t0 = get_time();
 
     int *local_y_dense = malloc(local_dense_rows * sizeof(int));
-    int *x_next_dense = malloc(N * sizeof(int));
+    int *x_current     = malloc(N * sizeof(int));
+    int *x_next_dense        = malloc(N * sizeof(int));
+    memcpy(x_current, x, N * sizeof(int));
 
-    if (rank == 0) {
-        y_dense_parallel = malloc(N * sizeof(int));
-        memcpy(x_next_dense, x, N * sizeof(int));
+    // if (rank == 0)
+    //     y_dense_parallel = malloc(N * sizeof(int));
+
+    // Prepare Allgatherv metadata ONCE
+    int *recv_counts_dense = malloc(size * sizeof(int));
+    int *recv_displs_dense = malloc(size * sizeof(int));
+    for (int p = 0; p < size; p++) {
+        int s = p * rows;
+        int e = (p == size - 1) ? N : s + rows;
+        recv_counts_dense[p] = e - s;
+        recv_displs_dense[p] = s;
     }
 
+    // Iterative multiplication
     for (int it = 0; it < iters; it++) {
+        // MPI_Barrier(MPI_COMM_WORLD);
+        // Compute local multiplication
         for (int i = 0; i < local_dense_rows; i++) {
             int sum = 0;
             for (int j = 0; j < N; j++)
-                sum += local_A_flat[i * N + j] * x[j];
+                sum += local_A_flat[i * N + j] * x_current[j];
             local_y_dense[i] = sum;
         }
 
-        int *recv_counts_dense = NULL;
-        int *recv_displs_dense = NULL;
-        if (rank == 0) {
-            recv_counts_dense = malloc(size * sizeof(int));
-            recv_displs_dense = malloc(size * sizeof(int));
-            for (int p = 0; p < size; p++) {
-                int s = p * rows;
-                int e = (p == size - 1) ? N : s + rows;
-                recv_counts_dense[p] = e - s; // number of rows
-                recv_displs_dense[p] = s;
-            }
-        }
-
-        MPI_Gatherv(local_y_dense,
-                    local_dense_rows,
-                    MPI_INT,
-                    rank == 0 ? y_dense_parallel : NULL,
-                    recv_counts_dense,
-                    recv_displs_dense,
-                    MPI_INT,
-                    0,
-                    MPI_COMM_WORLD);
-
-        if (rank == 0)
-            memcpy(x_next_dense, y_dense_parallel, N * sizeof(int));
-
-        MPI_Bcast(x_next_dense, N, MPI_INT, 0, MPI_COMM_WORLD);
-
-        int *tmp = x;
-        x = x_next_dense;
+        // Gather all local results to form full vector
+        MPI_Allgatherv(local_y_dense, local_dense_rows, MPI_INT,
+                    x_next_dense, recv_counts_dense, recv_displs_dense,
+                    MPI_INT, MPI_COMM_WORLD);
+        // MPI_Barrier(MPI_COMM_WORLD);
+        // Swap current and next vector pointers
+        int *tmp = x_current;
+        x_current = x_next_dense;
         x_next_dense = tmp;
-
-        if (rank == 0) {
-            free(recv_counts_dense);
-            free(recv_displs_dense);
-        }
     }
+
+    // copy final result to rank 0
+    if (rank == 0) {
+        y_dense_parallel = malloc(N * sizeof(int));
+        memcpy(y_dense_parallel, x_current, N * sizeof(int));
+    }
+
 
     t1 = get_time();
     dense_mult_time = t1 - t0;
 
+    // --- Cleanup ---
     free(local_A_flat);
     free(local_y_dense);
+    free(x_current);
     free(x_next_dense);
+    free(recv_counts_dense);
+    free(recv_displs_dense);
     if (rank == 0) {
         free(dense_row_counts);
         free(dense_row_displs);
     }
-
 
 
     //rank 0 prints results and frees allocated memory
