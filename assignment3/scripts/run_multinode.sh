@@ -1,55 +1,66 @@
 #!/bin/bash
-set -euo pipefail
 
-# Setup
+# MPICH paths
 MPICC="/usr/local/mpich3/bin/mpicc"
 MPIEXEC="/usr/local/mpich3/bin/mpiexec"
-BIN="./mpi_poly"
-CSV="multinode_results_final.csv"
 
-# Config
+# compile program
+echo "Compiling..."
+$MPICC src/poly_mult.c -o mpi_poly
+if [ $? -ne 0 ]; then
+    echo "Compilation failed!"
+    exit 1
+fi
+
+# csv output file (put in results/)
+mkdir -p results
+CSV_FILE="results/multinode_results_final.csv"
+echo "N,Nodes,Iteration,Send_Time,Comp_Time,Recv_Time,Total_Time,Status" > "$CSV_FILE"
+
+unset DISPLAY
+# use absolute path for the binary
+CURRENT_DIR=$(pwd)
+EXEC_PATH="$CURRENT_DIR/mpi_poly"
+
+# parameters
 SIZES="10000 50000 100000 200000"
 NODES="2 4 8 16 32 64"
 ITERS=4
 
-# Compile
-echo "Compiling..."
-$MPICC src/poly_mult.c -o "$BIN"
-
-# Init CSV
-echo "N,Nodes,Iteration,Send_Time,Comp_Time,Recv_Time,Total_Time,Status" > "$CSV"
-
-unset DISPLAY
-cwd=$(pwd)
-
-echo "Starting MPI benchmarks..."
-
+# run experiments
 for n in $SIZES; do
     for p in $NODES; do
         for ((i=1; i<=ITERS; i++)); do
-            
-            echo "N=$n P=$p Iter=$i"
+            echo "Running: N=$n | Processes=$p | Iter=$i..."
 
-            # Run with hostfile
-            # Note: Using full path for binary is safer in mpiexec
-            out=$($MPIEXEC -f machines -n $p "$cwd/mpi_poly" $n)
 
-            # Parse metrics
-            total=$(echo "$out" | grep "Total" | awk '{print $2}')
+            # run mpiexec and capture output (capture stderr)
+            OUTPUT=$($MPIEXEC -f machines -n $p "$EXEC_PATH" $n 2>&1)
 
-            if [ -n "$total" ]; then
-                t_send=$(echo "$out" | grep "Send time" | awk '{print $3}')
-                t_comp=$(echo "$out" | grep "Comp time" | awk '{print $3}')
-                t_recv=$(echo "$out" | grep "Recv time" | awk '{print $3}')
-                status=$(echo "$out" | grep "Result" | awk '{print $2}')
+            # get Total Execution Time (number before 'sec')
+            TOTAL=$(echo "$OUTPUT" | grep -i "Total Execution Time" | awk '{print $(NF-1)}')
 
-                echo "$n,$p,$i,$t_send,$t_comp,$t_recv,$total,$status" >> "$CSV"
+            if [ -n "$TOTAL" ]; then
+                # extract other metrics
+                SEND=$(echo "$OUTPUT" | grep -i "Send Time" | awk '{print $(NF-1)}')
+                COMP=$(echo "$OUTPUT" | grep -i "Computation Time" | awk '{print $(NF-1)}')
+                RECV=$(echo "$OUTPUT" | grep -i "Recv Time" | awk '{print $(NF-1)}')
+
+                # extract verification status (PASS/FAIL)
+                STATUS=$(echo "$OUTPUT" | grep -i "Verification Status" | awk '{print $NF}')
+
+                echo "  -> $STATUS: Time=$TOTAL sec"
+                echo "$n,$p,$i,$SEND,$COMP,$RECV,$TOTAL,$STATUS" >> "$CSV_FILE"
             else
-                echo "FAIL on N=$n P=$p"
-                echo "$out"
+                # total missing -> print error output
+                echo "  -> FAILED."
+                echo "---------------- ERROR OUTPUT ----------------"
+                echo "$OUTPUT"
+                echo "----------------------------------------------"
             fi
         done
     done
+    echo "---------------------------------------------"
 done
 
-echo "Done. Results in $CSV"
+echo "Done! Results saved in $CSV_FILE"
