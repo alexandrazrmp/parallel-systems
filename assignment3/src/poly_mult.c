@@ -5,8 +5,9 @@
 
 int main(int argc, char *argv[]) {
     int rank, nprocs, n, i, j, k;
-    int64_t *A, *B, *C, *local_C;
-    double t1, t2, t_send, t_comp, t_recv;
+    int64_t *A = NULL, *B = NULL, *C = NULL, *local_C = NULL;
+    // Αρχικοποίηση για την αποφυγή των warnings "maybe-uninitialized"
+    double t1 = 0.0, t2 = 0.0, t_send = 0.0, t_comp = 0.0, t_recv = 0.0;
     
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -19,14 +20,19 @@ int main(int argc, char *argv[]) {
     }
     
     n = atoi(argv[1]);
-    int res_sz = 2*n + 1;
+    int res_sz = 2 * n + 1;
     
-    A = malloc((n+1) * sizeof(int64_t));
-    B = malloc((n+1) * sizeof(int64_t));
+    // Όλες οι διεργασίες δεσμεύουν μνήμη για τα αρχικά πολυώνυμα A και B
+    A = malloc((n + 1) * sizeof(int64_t));
+    B = malloc((n + 1) * sizeof(int64_t));
     
-    // arxikopoihsh
     if (rank == 0) {
         C = malloc(res_sz * sizeof(int64_t));
+        if (!A || !B || !C) {
+            fprintf(stderr, "Allocation failed on root\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        
         srand(42);
         for (i = 0; i <= n; i++) {
             A[i] = (rand() % 20) - 10;
@@ -36,15 +42,18 @@ int main(int argc, char *argv[]) {
         }
     }
     
+    // Συγχρονισμός πριν την έναρξη των μετρήσεων
     MPI_Barrier(MPI_COMM_WORLD);
     
-    // broadcast ta A kai B
+    // 1. Χρόνος Αποστολής (Broadcast)
     if (rank == 0) t1 = MPI_Wtime();
-    MPI_Bcast(A, n+1, MPI_INT64_T, 0, MPI_COMM_WORLD);
-    MPI_Bcast(B, n+1, MPI_INT64_T, 0, MPI_COMM_WORLD);
+    
+    MPI_Bcast(A, n + 1, MPI_INT64_T, 0, MPI_COMM_WORLD);
+    MPI_Bcast(B, n + 1, MPI_INT64_T, 0, MPI_COMM_WORLD);
+    
     if (rank == 0) t_send = MPI_Wtime() - t1;
     
-    // ypologismos tou chunk gia kathe process
+    // Υπολογισμός ορίων για κάθε διεργασία (Load Balancing)
     int chunk = res_sz / nprocs;
     int rem = res_sz % nprocs;
     int my_start, my_cnt;
@@ -59,8 +68,9 @@ int main(int argc, char *argv[]) {
     
     local_C = malloc(my_cnt * sizeof(int64_t));
     
-    // ypologismos
     MPI_Barrier(MPI_COMM_WORLD);
+    
+    // 2. Χρόνος Υπολογισμού
     t1 = MPI_Wtime();
     
     for (k = 0; k < my_cnt; k++) {
@@ -69,16 +79,18 @@ int main(int argc, char *argv[]) {
         int jmin = (i > n) ? i - n : 0;
         int jmax = (i < n) ? i : n;
         for (j = jmin; j <= jmax; j++) {
-            sum += A[j] * B[i-j];
+            sum += A[j] * B[i - j];
         }
         local_C[k] = sum;
     }
     
     t2 = MPI_Wtime();
-    double my_time = t2 - t1;
-    MPI_Reduce(&my_time, &t_comp, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    double my_comp_time = t2 - t1;
     
-    // gather ta apotelesmata
+    // Παίρνουμε τον μέγιστο χρόνο υπολογισμού από όλες τις διεργασίες
+    MPI_Reduce(&my_comp_time, &t_comp, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    
+    // 3. Χρόνος Λήψης (Gather)
     int *cnts = NULL, *disps = NULL;
     if (rank == 0) {
         cnts = malloc(nprocs * sizeof(int));
@@ -97,23 +109,24 @@ int main(int argc, char *argv[]) {
     if (rank == 0) {
         t_recv = MPI_Wtime() - t1;
         
-        printf("n=%d, procs=%d\n", n, nprocs);
-        printf("Send time: %.6f sec\n", t_send);
-        printf("Comp time: %.6f sec\n", t_comp);
-        printf("Recv time: %.6f sec\n", t_recv);
-        printf("Total: %.6f sec\n", t_send + t_comp + t_recv);
+        // Εκτύπωση αποτελεσμάτων
+        printf("N=%d, Processes=%d\n", n, nprocs);
+        printf("Communication Send Time: %.6f sec\n", t_send);
+        printf("Computation Time (Max):  %.6f sec\n", t_comp);
+        printf("Communication Recv Time: %.6f sec\n", t_recv);
+        printf("Total Execution Time:    %.6f sec\n", t_send + t_comp + t_recv);
         
-        // verification
+        // Επιβεβαίωση (Verification)
         int ok = 1;
         for (i = 0; i < res_sz && ok; i++) {
             int64_t s = 0;
             int jmin = (i > n) ? i - n : 0;
             int jmax = (i < n) ? i : n;
             for (j = jmin; j <= jmax; j++)
-                s += A[j] * B[i-j];
+                s += A[j] * B[i - j];
             if (C[i] != s) ok = 0;
         }
-        printf("Result: %s\n", ok ? "OK" : "FAIL");
+        printf("Verification Status: %s\n", ok ? "PASS" : "FAIL");
         
         free(C);
         free(cnts);
@@ -123,6 +136,7 @@ int main(int argc, char *argv[]) {
     free(A);
     free(B);
     free(local_C);
+    
     MPI_Finalize();
     return 0;
 }

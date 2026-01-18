@@ -1,54 +1,75 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Setup paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASEDIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-
 BIN="$BASEDIR/bin/mergesort_omp"
 OUTDIR="$BASEDIR/results"
-RAW_CSV="$OUTDIR/results3.csv"
+RAW_CSV="$OUTDIR/results_mergesort.csv"
 
-# Experiment parameters
-ARRAY_SIZES=(10000000 100000000)   # 10^7 and 10^8
-ALGO_LIST=(0 1)                     # 0 = Serial, 1 = Parallel
-THREADS_LIST=(1 2 4 8 16)
+# Config
+SIZES=(10000000 100000000) # 10^7, 10^8
+THREADS=(1 2 4 8 16)
 REPEATS=3
 
+if [ ! -f "$BIN" ]; then
+    echo "Error: Binary not found at $BIN"
+    exit 1
+fi
+
 mkdir -p "$OUTDIR"
+
+# Init CSV
 echo "N,algorithm,threads,run,execution_time,verification" > "$RAW_CSV"
 
-# Run experiments
-for N in "${ARRAY_SIZES[@]}"; do
-  for algo in "${ALGO_LIST[@]}"; do
-    for threads in "${THREADS_LIST[@]}"; do
-      for ((run=1; run<=REPEATS; run++)); do
+echo "Starting benchmarks..."
 
-        echo "Running N=$N algo=$algo threads=$threads run=$run..."
+for N in "${SIZES[@]}"; do
+    
+    echo "-------------------------------------"
+    echo "Size: N=$N"
+    echo "-------------------------------------"
 
-        out="$("$BIN" "$N" "$algo" "$threads")"
-
-        # Extract execution time
-        exec_time=$(echo "$out" | grep "Execution time" | awk '{print $3}')
-        # Extract verification result
-        verification=$(echo "$out" | grep "Verification:" | awk '{print $2}')
-
-        printf "%d,%d,%d,%d,%s,%s\n" \
-          "$N" "$algo" "$threads" "$run" "$exec_time" "$verification" \
-          >> "$RAW_CSV"
-
-        # Check correctness
-        if [[ "$verification" != "PASS" ]]; then
-          echo "❌ Verification FAILED for N=$N algo=$algo threads=$threads run=$run"
-          echo "$out"
-          exit 1
+    # Serial runs (Algo 0)
+    echo "  > Serial..."
+    
+    for ((run=1; run<=REPEATS; run++)); do
+        # Run: size, algo=0, threads=1
+        out="$("$BIN" "$N" "0" "1")"
+        
+        t_exec=$(echo "$out" | grep "Execution time" | awk '{print $3}')
+        check=$(echo "$out" | grep "Verification:" | awk '{print $2}')
+        
+        printf "%d,0,1,%d,%s,%s\n" "$N" "$run" "$t_exec" "$check" >> "$RAW_CSV"
+        
+        if [[ "$check" != "PASS" ]]; then
+             echo "FAIL: Serial N=$N"
+             exit 1
         fi
-
-      done
     done
-  done
+
+    # Parallel runs (Algo 1)
+    echo "  > Parallel..."
+    
+    for th in "${THREADS[@]}"; do
+        for ((run=1; run<=REPEATS; run++)); do
+            
+            # Run: size, algo=1, threads
+            out="$("$BIN" "$N" "1" "$th")"
+
+            t_exec=$(echo "$out" | grep "Execution time" | awk '{print $3}')
+            check=$(echo "$out" | grep "Verification:" | awk '{print $2}')
+
+            printf "%d,1,%d,%d,%s,%s\n" "$N" "$th" "$run" "$t_exec" "$check" >> "$RAW_CSV"
+
+            if [[ "$check" != "PASS" ]]; then
+                echo "FAIL: Parallel N=$N Threads=$th"
+                exit 1
+            fi
+        done
+    done
 done
 
-echo "Experiments completed. Results saved to $RAW_CSV"
 echo ""
-echo "To plot results, run:"
-echo "python3 \"$BASEDIR/src/plot_mergesort.py\" \"$RAW_CSV\""
+echo "Done. Results in $RAW_CSV"

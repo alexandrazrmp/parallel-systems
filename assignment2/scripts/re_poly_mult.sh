@@ -1,53 +1,47 @@
-#!/usr/bin/env bash
-# Simple experiment driver for OpenMP assignment
-# Usage: ./scripts/run_experiments.sh
+#!/bin/bash
+set -euo pipefail
 
-set -e
-
-# Resolve paths
+# Setup paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASEDIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-
 BIN="$BASEDIR/bin/poly_mult_omp"
 OUTDIR="$BASEDIR/results"
-CSV_FILE="$OUTDIR/results.csv"
+CSV="$OUTDIR/results_2.1_omp.csv"
 
-# Experiment parameters
-DEGREES=(10000 50000 100000 500000)  # Polynomial degrees
-THREADS=(1 2 4 8)             # Thread counts to test
-REPEATS=3                     # Repeats for average
+# Config
+DEGREES=(10000 50000 100000 200000)
+THREADS=(1 2 4 8)
+REPEATS=4
 
-# Check if binary exists
 if [ ! -f "$BIN" ]; then
-    echo "Error: Binary $BIN not found. Run 'make' first."
+    echo "Error: Binary missing at $BIN"
     exit 1
 fi
 
-# Create results directory and write CSV header
 mkdir -p "$OUTDIR"
-echo "degree,threads,run,serial_time,parallel_time,verification" > "$CSV_FILE"
 
-echo "Starting experiments..."
+# Init CSV
+echo "degree,threads,run,serial_time,parallel_time,verification" > "$CSV"
 
-# Loop through all parameters
+echo "Starting OpenMP benchmarks..."
+
 for n in "${DEGREES[@]}"; do
     for th in "${THREADS[@]}"; do
         for ((i=1; i<=REPEATS; i++)); do
-            echo "Running: N=$n Threads=$th (Run $i/$REPEATS)"
             
-            # Run the program
-            output=$("$BIN" "$n" "$th")
-            
-            # Extract results using grep and awk
-            serial=$(echo "$output" | grep "Serial multiplication time" | awk '{print $(NF-1)}')
-            parallel=$(echo "$output" | grep "Parallel multiplication time" | awk '{print $(NF-1)}')
-            ver=$(echo "$output" | grep "Verification" | awk '{print $2}')
-            
-            # Save to CSV
-            echo "$n,$th,$i,$serial,$parallel,$ver" >> "$CSV_FILE"
+            # Run
+            echo "N=$n T=$th Run=$i"
+            out=$("$BIN" "$n" "$th")
+
+            # Parse
+            t_ser=$(echo "$out" | grep "Serial multiplication time" | awk '{print $(NF-1)}')
+            t_par=$(echo "$out" | grep "Parallel multiplication time" | awk '{print $(NF-1)}')
+            check=$(echo "$out" | grep "Verification" | awk '{print $2}')
+
+            # Save
+            echo "$n,$th,$i,$t_ser,$t_par,$check" >> "$CSV"
         done
     done
 done
 
-echo "Done. Results saved to: $CSV_FILE"
-echo "To plot, run: python3 src/plot_results.py $CSV_FILE"
+echo "Done. Results in $CSV"

@@ -1,9 +1,7 @@
 /*
- * assignment1/src/poly_mult.c
- * Exercise 1.1 - polynomial multiplication
+ * Polynomial multiplication (serial + pthreads)
  * Usage: ./bin/poly_mult <degree_n> <num_threads>
- *
- * Simple implementation of polynomial multiplication using both serial and parallel approaches.
+ * Small example used for timing and correctness checks.
  */
 
 #include <stdio.h>
@@ -12,7 +10,7 @@
 #include <stdint.h>
 #include <sys/time.h>
 
-// Structure to hold arguments for each thread
+// Thread argument block
 typedef struct {
     int start;
     int end;
@@ -22,7 +20,7 @@ typedef struct {
     int64_t *R;
 } ThreadArgs;
 
-// Function executed by each thread for parallel polynomial multiplication
+// Worker: compute result entries in [start..end]
 void* multiply_polynomials_parallel(void* arg) {
     ThreadArgs* args = (ThreadArgs*) arg;
     int n = args->n;
@@ -42,7 +40,7 @@ void* multiply_polynomials_parallel(void* arg) {
     return NULL;
 }
 
-// Function for serial polynomial multiplication
+// Single-threaded multiplication
 void multiply_polynomials_serial(int64_t *A, int64_t *B, int64_t *C_serial, int n) {
     for (int i = 0; i <= 2 * n; i++) {
         int64_t sum = 0;
@@ -55,7 +53,7 @@ void multiply_polynomials_serial(int64_t *A, int64_t *B, int64_t *C_serial, int 
     }
 }
 
-// Function to get the current time in seconds
+// Return current time in seconds
 double get_time() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -63,7 +61,7 @@ double get_time() {
 }
 
 int main(int argc, char* argv[]) {
-    // Argument parsing
+    // Parse arguments
     if (argc != 3) {
         fprintf(stderr, "Usage: %s <polynomial_degree> <num_threads>\n", argv[0]);
         exit(EXIT_FAILURE);
@@ -78,7 +76,7 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    double start_time, end_time;    // Timing variables
+    double start_time, end_time;    // timing
 
     // Allocate and initialize polynomials
     start_time = get_time();
@@ -92,7 +90,7 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    srand(42);  // For reproducibility
+    srand(42);  // fixed seed for repeatable inputs
     for (int i = 0; i <= n; i++) {
         A[i] = (int64_t)((rand() % 20) - 10); // Random integer -10 to 10
         B[i] = (int64_t)((rand() % 20) - 10);
@@ -102,13 +100,13 @@ int main(int argc, char* argv[]) {
     end_time = get_time();
     printf("Initialization time: %.6f seconds\n", end_time - start_time);
 
-    // Serial polynomial multiplication
+    // Run serial multiplication
     start_time = get_time();
     multiply_polynomials_serial(A, B, C_serial, n);
     end_time = get_time();
     printf("Serial multiplication time: %.6f seconds\n", end_time - start_time);
 
-    // Parallel polynomial multiplication
+    // Run parallel multiplication
     start_time = get_time();
     pthread_t *threads = malloc(num_threads * sizeof(pthread_t));
     ThreadArgs *thread_args = malloc(num_threads * sizeof(ThreadArgs));
@@ -129,14 +127,14 @@ int main(int argc, char* argv[]) {
         pthread_create(&threads[i], NULL, multiply_polynomials_parallel, &thread_args[i]);
     }
 
-    // Wait for all threads to finish
+    // Join threads
     for (int i = 0; i < num_threads; i++) {
         pthread_join(threads[i], NULL);
     }
     end_time = get_time();
     printf("Parallel multiplication time: %.6f seconds\n", end_time - start_time);
 
-    // Verification of results
+    // Verify results match
     int valid = 1;
     for (int i = 0; i <= 2 * n; i++) {
         if (C_serial[i] != C_parallel[i]) {
@@ -146,7 +144,7 @@ int main(int argc, char* argv[]) {
     }
     printf("Verification: %s\n", valid ? "PASS" : "FAIL");
 
-    // Free allocated memory
+    // Free memory
     free(A);
     free(B);
     free(C_serial);
