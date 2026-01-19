@@ -13,6 +13,7 @@ assignment4/bin/
 
 # Results and temporary experiment outputs
 */results/
+*/plots/
 
 # Object and dependency files
 *.o

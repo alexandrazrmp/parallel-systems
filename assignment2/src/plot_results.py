@@ -1,96 +1,161 @@
-#!/usr/bin/env python3
-import sys
-import csv
-import os
+import matplotlib
+matplotlib.use('Agg') # Fixes X11 errors on servers
+
+import pandas as pd
 import matplotlib.pyplot as plt
-from collections import defaultdict
+import os
+import sys
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python3 src/plot_results.py <results.csv>")
-        sys.exit(1)
+# --- Configuration ---
+# Update this path if your Pthreads file is somewhere else
+pth_path = "../../assignment1/results/results_1.1.csv"
+output_dir = "../plots"
 
-    csv_path = sys.argv[1]
-    out_dir = os.path.dirname(csv_path)
+# --- 1. Load Data ---
+if len(sys.argv) < 2:
+    print("Usage: python3 plots_mergesort.py <mergesort_results.csv>")
+    sys.exit(1)
+
+mergesort_path = sys.argv[1]
+
+if not os.path.exists(mergesort_path):
+    print(f"Error: Mergesort file not found: {mergesort_path}")
+    sys.exit(1)
+
+try:
+    # Load Mergesort Data
+    df_merge = pd.read_csv(mergesort_path)
+    # Clean column names
+    df_merge.columns = df_merge.columns.str.strip()
+
+    # Load Pthreads Data (for comparison)
+    df_pth = None
+    if os.path.exists(pth_path):
+        df_pth = pd.read_csv(pth_path)
+        df_pth.columns = df_pth.columns.str.strip()
+    else:
+        print(f"Warning: Pthreads file not found at {pth_path}. Comparison plot will be skipped.")
+
+except Exception as e:
+    print(f"Error reading CSVs: {e}")
+    sys.exit(1)
+
+# --- 2. Process Mergesort Data ---
+plot_data = {}
+unique_Ns = sorted(df_merge['N'].unique())
+
+for N in unique_Ns:
+    subset = df_merge[df_merge['N'] == N]
     
-    # Data structure: data[degree][threads] = [list of times]
-    serial_data = defaultdict(lambda: defaultdict(list))
-    parallel_data = defaultdict(lambda: defaultdict(list))
+    # Serial Baseline (Algorithm 0)
+    serial_subset = subset[subset['algorithm'] == 0]
+    if serial_subset.empty: continue
+    avg_serial = serial_subset['execution_time'].mean()
 
-    # 1. Read CSV
-    try:
-        with open(csv_path, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                n = int(row['degree'])
-                th = int(row['threads'])
-                s_time = float(row['serial_time'])
-                p_time = float(row['parallel_time'])
-                
-                serial_data[n][th].append(s_time)
-                parallel_data[n][th].append(p_time)
-    except Exception as e:
-        print(f"Error reading CSV: {e}")
-        sys.exit(1)
+    # Parallel Data (Algorithm 1)
+    par_subset = subset[subset['algorithm'] == 1]
+    
+    threads = sorted(par_subset['threads'].unique())
+    times = []
+    std_devs = []
+    speedups = []
 
-    # 2. Calculate Averages and Speedup
-    plot_data = {}
+    for th in threads:
+        runs = par_subset[par_subset['threads'] == th]['execution_time']
+        avg_t = runs.mean()
+        std_t = runs.std() if len(runs) > 1 else 0.0
+        
+        times.append(avg_t)
+        std_devs.append(std_t)
+        speedups.append(avg_serial / avg_t)
 
-    for n in serial_data.keys():
-        threads_list = sorted(serial_data[n].keys())
-        avg_p_times = []
-        avg_speedups = []
+    plot_data[N] = {
+        "threads": threads,
+        "times": times,
+        "std": std_devs,
+        "speedup": speedups
+    }
 
-        for th in threads_list:
-            # Calculate averages across runs
-            avg_serial = sum(serial_data[n][th]) / len(serial_data[n][th])
-            avg_parallel = sum(parallel_data[n][th]) / len(parallel_data[n][th])
-            
-            # Calculate Speedup
-            speedup = avg_serial / avg_parallel if avg_parallel > 0 else 0
-
-            avg_p_times.append(avg_parallel)
-            avg_speedups.append(speedup)
-
-        plot_data[n] = {
-            'threads': threads_list,
-            'times': avg_p_times,
-            'speedup': avg_speedups
+# --- 3. Process Pthreads Data (Reference) ---
+pth_speedup_data = None
+if df_pth is not None:
+    # Use the largest dataset for comparison (N=200,000)
+    target_deg = 200000
+    col_name = 'degree' if 'degree' in df_pth.columns else 'N'
+    
+    sub_pth = df_pth[df_pth[col_name] == target_deg]
+    
+    if not sub_pth.empty:
+        # Group by threads
+        pth_avg = sub_pth.groupby('threads').mean(numeric_only=True).reset_index()
+        
+        # Calculate speedup (Average Serial / Average Parallel)
+        avg_serial_pth = pth_avg['serial_time'].mean()
+        pth_avg['speedup'] = avg_serial_pth / pth_avg['parallel_time']
+        
+        pth_speedup_data = {
+            "threads": pth_avg['threads'],
+            "speedup": pth_avg['speedup']
         }
 
-    # 3. Generate Plots
+# --- 4. Plotting ---
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+print(f"Generating plots in '{output_dir}'...")
+
+colors = ['blue', 'red', 'green']
+
+# Plot 1: Mergesort Execution Time
+plt.figure(figsize=(8, 5))
+for i, (N, d) in enumerate(plot_data.items()):
+    plt.errorbar(d["threads"], d["times"], yerr=d["std"], 
+                 marker='o', label=f'Mergesort N={N}', color=colors[i % len(colors)], capsize=5)
+
+plt.xlabel("Threads")
+plt.ylabel("Time (s)")
+plt.title("Mergesort Execution Time")
+plt.yscale('log') # Log scale to see 10^7 and 10^8 clearly
+plt.grid(True, which="both", alpha=0.5)
+plt.legend()
+plt.tight_layout()
+plt.savefig(f'{output_dir}/mergesort_time.png')
+
+# Plot 2: Mergesort Speedup
+plt.figure(figsize=(8, 5))
+# Ideal line
+max_th = 16
+plt.plot([1, max_th], [1, max_th], 'k--', alpha=0.5, label="Ideal")
+
+for i, (N, d) in enumerate(plot_data.items()):
+    plt.plot(d["threads"], d["speedup"], marker='o', label=f'Mergesort N={N}', color=colors[i % len(colors)])
+
+plt.xlabel("Threads")
+plt.ylabel("Speedup")
+plt.title("Mergesort Speedup")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.savefig(f'{output_dir}/mergesort_speedup.png')
+
+# Plot 3: Comparison (Mergesort vs Pthreads Scalability)
+if pth_speedup_data:
+    plt.figure(figsize=(8, 5))
     
-    # Plot 1: Execution Time vs Threads
-    plt.figure(figsize=(10, 6))
-    for n, data in sorted(plot_data.items()):
-        plt.plot(data['threads'], data['times'], marker='o', label=f'N={n}')
+    # Plot Mergesort
+    for i, (N, d) in enumerate(plot_data.items()):
+        plt.plot(d["threads"], d["speedup"], marker='o', label=f'Mergesort (OpenMP) N={N}', color=colors[i % len(colors)])
     
-    plt.xlabel('Threads')
-    plt.ylabel('Time (seconds)')
-    plt.title('Execution Time vs Threads')
-    plt.legend()
+    # Plot Pthreads
+    plt.plot(pth_speedup_data["threads"], pth_speedup_data["speedup"], 
+             marker='^', linestyle='--', color='purple', label='PolyMult (Pthreads) N=200k')
+
+    plt.xlabel("Threads")
+    plt.ylabel("Speedup")
+    plt.title("Scalability Comparison: OpenMP Tasks vs Pthreads")
     plt.grid(True)
-    plt.savefig(os.path.join(out_dir, 'plot_time.png'))
-    plt.close()
-
-    # Plot 2: Speedup vs Threads
-    plt.figure(figsize=(10, 6))
-    for n, data in sorted(plot_data.items()):
-        plt.plot(data['threads'], data['speedup'], marker='o', label=f'N={n}')
-    
-    # Add ideal speedup line (reference)
-    max_th = max(max(d['threads']) for d in plot_data.values())
-    plt.plot([1, max_th], [1, max_th], 'k--', alpha=0.5, label='Ideal')
-
-    plt.xlabel('Threads')
-    plt.ylabel('Speedup')
-    plt.title('Speedup vs Threads')
     plt.legend()
-    plt.grid(True)
-    plt.savefig(os.path.join(out_dir, 'plot_speedup.png'))
-    plt.close()
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/comparison_speedup.png')
 
-    print(f"Plots saved in: {out_dir}")
-
-if __name__ == "__main__":
-    main()
+print("Done!")
