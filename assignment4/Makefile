@@ -1,6 +1,5 @@
-
 CC = gcc
-CFLAGS = -O2 -Wall -pthread
+CFLAGS = -O3 -Wall -mavx2
 BIN_DIR = bin
 SRC_DIR = src
 TARGET = $(BIN_DIR)/poly_mult
