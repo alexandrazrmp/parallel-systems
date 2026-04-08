@@ -1,29 +1,36 @@
 # Parallel Systems
 
 ## Overview
-Course projects exploring parallel programming and performance-oriented systems concepts. The repository includes multiple assignments focused on concurrency, scalability, and computational performance in Linux environments.
+Collection of projects focused on parallel programming and performance optimization in Linux environments. Each assignment explores a different parallelization model, from shared-memory threading to distributed and GPU-based computation.
 
 ## Contents
-- `assignment1/`
-- `assignment2/`
-- `assignment3/`
-- `assignment4/`
+- **Pthreads Programming** → `assignment1/`
+- **OpenMP Programming** → `assignment2/`
+- **MPI Programming** → `assignment3/`
+- **SIMD & CUDA Programming** → `assignment4/`
 
 ## Topics Covered
-- Parallel programming
-- Performance benchmarking
-- Process and thread coordination
-- Scalable computation
-- Linux-based systems development
+- Shared-memory parallelism (Pthreads, OpenMP)
+- Distributed systems (MPI)
+- GPU computing (CUDA)
+- SIMD vectorization
+- Performance benchmarking and optimization
 
 ## Tech Stack
 - C / C++
-- MPI / OpenMP / CUDA
+- Pthreads, OpenMP, MPI
+- CUDA
 - Bash
 - Linux
 
-## Skills Demonstrated
-- Parallel systems programming
-- Performance analysis
-- Debugging computational workloads
-- Organizing multi-assignment technical projects
+## Key Skills Demonstrated
+- Parallel algorithm implementation
+- Performance optimization and benchmarking
+- Understanding of memory models and concurrency
+- Debugging parallel and distributed programs
+
+## What I Learned
+- Trade-offs between different parallel programming models
+- Scaling performance across threads, processes, and GPUs
+- Identifying bottlenecks in computational workloads
+- Writing efficient low-level code for high-performance systems
